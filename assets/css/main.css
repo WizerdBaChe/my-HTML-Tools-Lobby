@@ -155,3 +155,20 @@ body {
     height: 50vh;
   }
 }
+
+.hero-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-links a {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e5e7eb;
+}
