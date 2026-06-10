@@ -9,7 +9,7 @@
 <body>
   <header class="hero">
     <h1>HTML 工具大廳</h1>
-    <p>集中管理各種 HTML 小工具，支援卡片瀏覽、直接開啟與內嵌預覽。</p>
+    <p>集中管理各種 HTML 小工具，支援卡片瀏覽、直接開啟、分類篩選與內嵌預覽。</p>
     <div class="hero-links">
       <a href="./pages/about/">關於本站</a>
       <a href="./pages/changelog/">更新紀錄</a>
@@ -19,15 +19,36 @@
   <main class="layout">
     <section>
       <div class="toolbar">
-        <input id="searchInput" type="text" placeholder="搜尋工具名稱、標籤..." />
+        <input id="searchInput" type="text" placeholder="搜尋工具名稱、描述、標籤..." />
       </div>
+
+      <section class="filters-panel">
+        <div class="filters-head">
+          <h2>分類篩選</h2>
+          <button id="resetFilters" type="button">重設</button>
+        </div>
+        <div id="categoryFilters" class="filter-row"></div>
+      </section>
+
+      <section class="legend-panel">
+        <h2>狀態說明</h2>
+        <div class="legend-row">
+          <span class="status-badge status-ready">READY</span>
+          <span>可正常使用</span>
+          <span class="status-badge status-beta">BETA</span>
+          <span>可使用，但可能仍在調整</span>
+          <span class="status-badge status-draft">DRAFT</span>
+          <span>雛形或開發中</span>
+        </div>
+      </section>
+
       <section class="tool-grid" id="toolGrid"></section>
     </section>
 
     <aside class="preview-panel">
       <div class="preview-bar">
         <span>工具預覽區</span>
-        <button id="clearPreview">關閉預覽</button>
+        <button id="clearPreview" type="button">關閉預覽</button>
       </div>
       <iframe id="previewFrame" src="" title="工具預覽"></iframe>
     </aside>
