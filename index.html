@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML 工具大廳</title>
+  <link rel="stylesheet" href="./assets/css/main.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>HTML 工具大廳</h1>
+    <p>集中管理各種小工具，支援卡片瀏覽、快速開啟與內嵌預覽。</p>
+  </header>
+
+  <main class="layout">
+    <section class="tool-grid" id="toolGrid">
+      <article class="card">
+        <h2>計算機 (Calculator)</h2>
+        <p>基本四則運算工具。</p>
+        <div class="actions">
+          <a href="./tools/calculator/" target="_blank">開啟</a>
+          <button data-src="./tools/calculator/">預覽</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>JSON 檢視器 (JSON Viewer)</h2>
+        <p>格式化與查看 JSON 資料。</p>
+        <div class="actions">
+          <a href="./tools/json-viewer/" target="_blank">開啟</a>
+          <button data-src="./tools/json-viewer/">預覽</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="preview-panel">
+      <div class="preview-bar">
+        <span>工具預覽區</span>
+        <button id="clearPreview">關閉預覽</button>
+      </div>
+      <iframe id="previewFrame" src="" title="工具預覽"></iframe>
+    </section>
+  </main>
+
+  <script src="./assets/js/lobby.js"></script>
+</body>
+</html>
