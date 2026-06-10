@@ -1,0 +1,13 @@
+[
+  {
+    "id": "1:1 Image Filler",
+    "name": "IG發文白底填充",
+    "name_en": "IG-Image-Filler",
+    "description": "基本四則運算工具。",
+    "path": "./tools/1:1 Image Filler/",
+    "category": "utility",
+    "tags": ["Image", "Photo", "Social Media"],
+    "supportsIframe": true,
+    "status": "ready"
+  }
+]
