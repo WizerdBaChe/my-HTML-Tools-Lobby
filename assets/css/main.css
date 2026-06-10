@@ -8,14 +8,36 @@ body {
 }
 
 .hero {
-  padding: 32px 24px 12px;
+  padding: 32px 24px 16px;
+}
+
+.hero h1 {
+  margin: 0 0 8px;
+}
+
+.hero p {
+  margin: 0;
+  color: #cbd5e1;
 }
 
 .layout {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: 1.2fr 1fr;
   gap: 20px;
   padding: 24px;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+}
+
+.toolbar input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #e5e7eb;
 }
 
 .tool-grid {
@@ -37,13 +59,49 @@ body {
   border-color: #60a5fa;
 }
 
+.card h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+
+.card small {
+  color: #94a3b8;
+  font-size: 0.8em;
+}
+
+.card p {
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.tag-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #93c5fd;
+  font-size: 12px;
+}
+
 .actions {
   display: flex;
   gap: 10px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
-.actions a, .actions button, .preview-bar button {
+.actions a,
+.actions button,
+.preview-bar button {
   background: #2563eb;
   color: white;
   border: none;
@@ -51,6 +109,11 @@ body {
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
+}
+
+.actions button:disabled {
+  background: #475569;
+  cursor: not-allowed;
 }
 
 .preview-panel {
@@ -71,35 +134,24 @@ body {
 
 #previewFrame {
   width: 100%;
-  height: calc(70vh - 50px);
+  height: calc(70vh - 49px);
   border: 0;
   background: white;
+}
+
+.empty-state {
+  padding: 18px;
+  border: 1px dashed #475569;
+  border-radius: 16px;
+  color: #cbd5e1;
 }
 
 @media (max-width: 960px) {
   .layout {
     grid-template-columns: 1fr;
   }
-}
 
-.tag-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 10px 0 14px;
-}
-
-.tag {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  color: #93c5fd;
-  font-size: 12px;
-}
-
-.card small {
-  color: #94a3b8;
-  font-size: 0.8em;
+  #previewFrame {
+    height: 50vh;
+  }
 }
