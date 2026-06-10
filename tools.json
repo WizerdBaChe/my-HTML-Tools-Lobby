@@ -8,6 +8,10 @@
     "category": "utility",
     "tags": ["Image", "Photo", "Social Media"],
     "supportsIframe": true,
-    "status": "ready"
+    "status": "ready",
+    "featured": true,
+    "isNew": false,
+    "order": 1,
+    "updatedAt": "2026-06-11"
   }
 ]
