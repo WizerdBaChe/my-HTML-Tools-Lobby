@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 | 找不到頁面</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #0f172a, #111827);
+      color: #e5e7eb;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(680px, 100%);
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 32px 24px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+    }
+
+    p {
+      line-height: 1.7;
+      color: #cbd5e1;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 12px;
+      text-decoration: none;
+      background: #2563eb;
+      color: white;
+      border: 1px solid #3b82f6;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: #cbd5e1;
+      border-color: #475569;
+    }
+
+    code {
+      background: #0f172a;
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>404：找不到頁面</h1>
+    <p>你要找的頁面可能不存在、路徑打錯，或是工具位置已經被移動。</p>
+    <p>如果你是手動輸入網址，請檢查路徑；如果你是從舊書籤進來，可以先回到大廳頁重新進入工具。</p>
+    <p>建議回到 <code>index.html</code> 對應的 Lobby 首頁，再從卡片重新開啟工具。</p>
+
+    <div class="actions">
+      <a class="btn" href="./">回到首頁</a>
+      <a class="btn secondary" href="./pages/about/">關於本站</a>
+    </div>
+  </main>
+</body>
+</html>
