@@ -1,1 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>更新紀錄 | HTML 工具大廳</title>
+  <style>
+    :root { color-scheme: dark; }
 
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      line-height: 1.75;
+    }
+
+    .container {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .nav {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .nav a {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e5e7eb;
+    }
+
+    .hero,
+    .entry {
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+    }
+
+    p, li {
+      color: #cbd5e1;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .meta {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      font-size: 0.9rem;
+    }
+
+    code {
+      background: #0f172a;
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a href="../../">回到首頁</a>
+      <a href="../about/">關於本站</a>
+    </nav>
+
+    <section class="hero">
+      <h1>更新紀錄 (Changelog)</h1>
+      <p>這個頁面用來記錄工具、首頁、文件與結構變更，方便追蹤專案演進。</p>
+      <p>目前先採用手動維護的簡單格式，後續再視需要改為更正式的版本紀錄方式。</p>
+    </section>
+
+    <section class="entry">
+      <span class="meta">2026-06-11 · MVP</span>
+      <h2>初始化工具大廳</h2>
+      <ul>
+        <li>建立首頁 Lobby 與卡片式工具展示。</li>
+        <li>加入 iframe 預覽區塊。</li>
+        <li>建立 <code>tools.json</code> 作為工具資料來源。</li>
+        <li>加入自訂 <code>404.html</code>。</li>
+        <li>新增 About 與 Changelog 基礎頁面。</li>
+        <li>補上 README 與維護文件。</li>
+      </ul>
+    </section>
+
+    <section class="entry">
+      <span class="meta">後續建議</span>
+      <h2>下一階段可做項目</h2>
+      <ul>
+        <li>搜尋與分類功能優化。</li>
+        <li>加入工具狀態標記，例如 ready、beta、draft。</li>
+        <li>補強首頁空狀態與錯誤提示。</li>
+        <li>讓 changelog 與 tools.json 之間建立更清楚的更新對應。</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>
