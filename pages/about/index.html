@@ -6,9 +6,7 @@
   <title>關於本站 | HTML 工具大廳</title>
   <style>
     :root { color-scheme: dark; }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: Arial, "Noto Sans TC", sans-serif;
@@ -16,20 +14,17 @@
       color: #e5e7eb;
       line-height: 1.75;
     }
-
     .container {
       width: min(960px, calc(100% - 32px));
       margin: 0 auto;
       padding: 32px 0 48px;
     }
-
     .nav {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       margin-bottom: 24px;
     }
-
     .nav a {
       display: inline-block;
       padding: 10px 14px;
@@ -39,41 +34,26 @@
       border: 1px solid #334155;
       color: #e5e7eb;
     }
-
-    .hero,
-    .section {
+    .hero, .section {
       background: #111827;
       border: 1px solid #334155;
       border-radius: 20px;
       padding: 24px;
       margin-bottom: 20px;
     }
-
-    h1, h2 {
-      margin-top: 0;
-    }
-
-    p, li {
-      color: #cbd5e1;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-    }
-
+    h1, h2, h3 { margin-top: 0; }
+    p, li { color: #cbd5e1; }
+    ul { margin: 0; padding-left: 20px; }
     code {
       background: #0f172a;
       padding: 2px 6px;
       border-radius: 8px;
     }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
     }
-
     .mini-card {
       background: #1e293b;
       border: 1px solid #334155;
@@ -91,8 +71,8 @@
 
     <section class="hero">
       <h1>關於本站 (About)</h1>
-      <p>這是一個以 GitHub Pages 為基礎的靜態 HTML 工具集合站，用來集中整理與展示多個獨立的小工具。</p>
-      <p>首頁作為 Lobby（大廳頁），負責列出工具卡片、提供快速開啟入口，並讓部分工具可以透過 iframe 方式在首頁內預覽。</p>
+      <p>這是一個以 GitHub Pages 為基礎的靜態 HTML 工具集合站，用來集中整理多個獨立小工具。</p>
+      <p>首頁作為 Lobby，負責讀取 <code>tools.json</code>，並提供精選工具、搜尋、分類、排序與 iframe 預覽功能。</p>
     </section>
 
     <section class="section">
@@ -101,29 +81,28 @@
         <li>把零散的小工具集中到同一個 repo 管理。</li>
         <li>讓每個工具保有獨立頁面與清楚路徑。</li>
         <li>用一致的卡片式入口降低維護成本。</li>
-        <li>先以 MVP 為主，再逐步增加搜尋、分類、標籤與互動功能。</li>
+        <li>維持靜態站架構，避免不必要的複雜化。</li>
       </ul>
     </section>
 
     <section class="section">
-      <h2>目前架構</h2>
-      <p>本站採用純靜態架構，主要由 <code>index.html</code>、<code>tools.json</code>、各工具資料夾與基礎頁面組成。</p>
+      <h2>目前功能</h2>
       <div class="grid">
         <div class="mini-card">
-          <h3>Lobby</h3>
-          <p>首頁負責讀取 <code>tools.json</code> 並產生卡片。</p>
+          <h3>Tool Cards</h3>
+          <p>首頁自動根據 <code>tools.json</code> 產生工具卡片。</p>
         </div>
         <div class="mini-card">
-          <h3>Tools</h3>
-          <p>每個工具獨立放在 <code>tools/&lt;tool-id&gt;/</code>。</p>
+          <h3>Featured</h3>
+          <p>可指定精選工具顯示在首頁上方。</p>
         </div>
         <div class="mini-card">
-          <h3>Preview</h3>
-          <p>支援的工具可在首頁以 iframe 預覽。</p>
+          <h3>Filter & Sort</h3>
+          <p>支援搜尋、分類篩選與排序。</p>
         </div>
         <div class="mini-card">
-          <h3>Docs</h3>
-          <p>README 與維護文件負責記錄用途與規則。</p>
+          <h3>Status</h3>
+          <p>支援 READY、BETA、DRAFT、NEW 等標記。</p>
         </div>
       </div>
     </section>
@@ -131,20 +110,10 @@
     <section class="section">
       <h2>使用方式</h2>
       <ul>
-        <li>從首頁瀏覽工具卡片。</li>
+        <li>從首頁瀏覽精選工具與全部工具。</li>
+        <li>使用搜尋框、分類按鈕與排序快速定位工具。</li>
         <li>點擊「開啟」進入獨立工具頁。</li>
-        <li>若工具支援預覽，可在首頁小視窗中直接載入。</li>
-        <li>若連結失效，請返回首頁重新選取工具。</li>
-      </ul>
-    </section>
-
-    <section class="section">
-      <h2>後續方向</h2>
-      <ul>
-        <li>工具分類與標籤篩選。</li>
-        <li>搜尋與排序。</li>
-        <li>最近新增工具區塊。</li>
-        <li>更完整的 changelog 與說明文件。</li>
+        <li>若工具支援，可直接在首頁預覽。</li>
       </ul>
     </section>
   </div>
