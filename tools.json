@@ -10,16 +10,16 @@
     "supportsIframe": true,
     "status": "ready",
     "featured": true,
-    "isNew": false,
+    "isNew": true,
     "order": 1,
     "updatedAt": "2026-06-11"
   },
   {
-    "id": "Image-Color-Picker",
-    "name": "IG 圖片填充器",
-    "name_en": "Image-Color-Picker",
-    "description": "滴管抓取圖片中顏色，並顯示色號",
-    "path": "./tools/Image-Color-Picker/",
+    "id": "Background-Remover",
+    "name": "背景顏色去除器IG",
+    "name_en": "Background-Remover",
+    "description": "去除純色背景，還你透明背景圖片",
+    "path": "./tools/Background-Remover/",
     "category": "image",
     "tags": ["color", "image", "placeholder"],
     "supportsIframe": true,
@@ -27,6 +27,21 @@
     "featured": true,
     "isNew": true,
     "order": 2,
+    "updatedAt": "2026-06-11"
+  },
+  {
+    "id": "HTML+CSS+JS-Merger",
+    "name": "HTML+CSS+JS合併器",
+    "name_en": "HTML+CSS+JS-Merger",
+    "description": "合併HTML+CSS+JS為單一HTML",
+    "path": "./tools/HTML+CSS+JS-Merger/",
+    "category": "developer",
+    "tags": ["html","web","file-processer"],
+    "supportsIframe": true,
+    "status": "ready",
+    "featured": true,
+    "isNew": true,
+    "order": 3,
     "updatedAt": "2026-06-11"
   }
 ]

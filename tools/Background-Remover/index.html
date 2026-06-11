@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>純色去背小工具 V2.0</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <h1>純色去背小工具 V2.0</h1>
+      <p class="subtitle">選擇圖片並使用滴管工具，點擊要去背的背景顏色！</p>
+    </header>
+    <div class="warning-section card">
+      <h3>限制</h3>
+      <p>圖片最大 10MB、最高解析度 4000×4000，僅支援 PNG/JPEG/WebP。</p>
+    </div>
+    <div class="upload-section card">
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" aria-label="選擇圖片">
+      <div id="dropZone" class="drop-zone" tabindex="0" aria-label="拖曳圖片進行上傳">
+        <div class="drop-zone-content">
+          <p class="drop-text">將圖片拖曳到這裡或<span class="browse-link">點此選擇</span></p>
+          <p class="format-info">支援: PNG、JPEG、WebP</p>
+        </div>
+      </div>
+    </div>
+    <div id="previewSection" class="preview-section hidden">
+      <div class="preview-container">
+        <div class="original-preview">
+          <h3>原始圖片</h3>
+          <div class="canvas-container">
+            <canvas id="originalCanvas"></canvas>
+            <div id="eyedropperOverlay" class="eyedropper-overlay hidden"></div>
+          </div>
+          <div class="selected-color-preview">
+            <span id="selectedColorDisplay"></span>
+            <span id="selectedColorText"></span>
+          </div>
+        </div>
+        <div class="result-preview">
+          <h3>去背結果預覽</h3>
+          <canvas id="previewCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+    <div id="controlsSection" class="controls-section hidden">
+      <button id="eyedropperBtn" aria-label="啟用滴管工具選擇背景色">🎨滴管工具</button>
+      <label>
+        容差值
+        <input type="range" id="toleranceSlider" min="1" max="100" value="30">
+        <span id="toleranceValue">30</span>
+      </label>
+      <button id="resetBtn">重置</button>
+      <button id="downloadBtn" disabled>下載去背圖片</button>
+    </div>
+    <div id="loadingSpinner" class="loading-spinner hidden"></div>
+    <div id="statusText" class="status-text"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
