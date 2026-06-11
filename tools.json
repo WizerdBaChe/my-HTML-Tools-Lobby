@@ -1,6 +1,6 @@
 [
   {
-    "id": "ig-image-filler",
+    "id": "IG-Image-Filler",
     "name": "IG 圖片填充器",
     "name_en": "IG-Image-Filler",
     "description": "快速產生符合 Instagram 比例的佔位圖片，方便排版測試與預覽。",
@@ -10,7 +10,7 @@
     "supportsIframe": true,
     "status": "ready",
     "featured": true,
-    "isNew": false,
+    "isNew": true,
     "order": 1,
     "updatedAt": "2026-06-11"
   }
