@@ -1,12 +1,12 @@
 [
   {
-    "id": "1:1 Image Filler",
-    "name": "IG發文白底填充",
+    "id": "ig-image-filler",
+    "name": "IG 圖片填充器",
     "name_en": "IG-Image-Filler",
-    "description": "基本四則運算工具。",
-    "path": "./tools/1:1 Image Filler/",
-    "category": "utility",
-    "tags": ["Image", "Photo", "Social Media"],
+    "description": "快速產生符合 Instagram 比例的佔位圖片，方便排版測試與預覽。",
+    "path": "./tools/IG-Image-Filler/",
+    "category": "image",
+    "tags": ["instagram", "image", "placeholder"],
     "supportsIframe": true,
     "status": "ready",
     "featured": true,
