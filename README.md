@@ -48,7 +48,7 @@
 │  └─ changelog/
 │     └─ index.html
 └─ tools/
-   ├─ calculator/
+   ├─ 1:1 Image Filler/
       └─ index.html
 ....
 ```
