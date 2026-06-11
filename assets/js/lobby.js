@@ -80,9 +80,14 @@ async function loadTools() {
 
 /* Derive the lobby's base path so relative links work from subdirs */
 function getBasePath() {
-  const path = location.pathname;
-  const depth = (path.match(/\//g) || []).length - 1;
-  return depth > 0 ? '../'.repeat(depth) : './';
+  // 找到 lobby.js 所在的 assets/js/ 目錄，
+  // 往上兩層就是 repo 根目錄，不受 repo 名稱影響
+  const script = document.querySelector('script[src*="lobby.js"]');
+  if (script) {
+    return new URL('../../', new URL(script.src, location.href)).href;
+  }
+  // fallback：從目前頁面的 pathname 找到 index.html 所在目錄
+  return location.href.replace(/\/[^/]*$/, '/');
 }
 
 /* ── Rendering ──────────────────────────────────────────────── */
