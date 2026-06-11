@@ -1,280 +1,371 @@
-const toolGrid = document.getElementById("toolGrid");
-const featuredGrid = document.getElementById("featuredGrid");
-const frame = document.getElementById("previewFrame");
-const clearBtn = document.getElementById("clearPreview");
-const searchInput = document.getElementById("searchInput");
-const sortSelect = document.getElementById("sortSelect");
-const categoryFilters = document.getElementById("categoryFilters");
-const resetFilters = document.getElementById("resetFilters");
-const resultCount = document.getElementById("resultCount");
+/**
+ * HTML Tools Lobby — lobby.js
+ * Data flow: fetch tools.json → render featured + all tools
+ * Handles: search, category filter, sort, iframe preview modal
+ */
 
-let allTools = [];
-let activeCategory = "all";
-
-const categoryLabelMap = {
-  all: "全部",
-  utility: "通用工具",
-  developer: "開發工具",
-  text: "文字處理",
-  data: "資料處理",
-  image: "圖像處理",
-  experimental: "實驗工具"
+/* ── State ──────────────────────────────────────────────────── */
+const state = {
+  tools: [],
+  query: '',
+  category: 'all',
+  sort: 'order',
 };
 
-const statusLabelMap = {
-  ready: "READY",
-  beta: "BETA",
-  draft: "DRAFT"
+/* ── Category icon map ──────────────────────────────────────── */
+const CATEGORY_ICONS = {
+  utility:      '🔧',
+  developer:    '💻',
+  text:         '📝',
+  data:         '📊',
+  image:        '🖼️',
+  experimental: '🧪',
+  default:      '⚙️',
 };
 
-const statusOrderMap = {
-  ready: 1,
-  beta: 2,
-  draft: 3
+/* ── Status → badge class map ───────────────────────────────── */
+const STATUS_CLASS = {
+  ready: 'badge--ready',
+  beta:  'badge--beta',
+  draft: 'badge--draft',
 };
 
-function escapeHtml(value = "") {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+/* ── DOM refs ───────────────────────────────────────────────── */
+let $searchInput, $sortSelect, $filterBtns, $featuredSection, $featuredGrid,
+    $allSection, $allGrid, $toolCount, $modal, $modalOverlay, $modalTitle,
+    $modalIframe, $modalOpenLink;
+
+/* ── Bootstrap ──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  cacheDOM();
+  loadTools();
+  bindEvents();
+  highlightCurrentNav();
+});
+
+function cacheDOM() {
+  $searchInput    = document.getElementById('search-input');
+  $sortSelect     = document.getElementById('sort-select');
+  $filterBtns     = document.querySelectorAll('[data-category]');
+  $featuredSection= document.getElementById('section-featured');
+  $featuredGrid   = document.getElementById('featured-grid');
+  $allSection     = document.getElementById('section-all');
+  $allGrid        = document.getElementById('all-grid');
+  $toolCount      = document.getElementById('tool-count');
+  $modalOverlay   = document.getElementById('modal-overlay');
+  $modal          = document.getElementById('preview-modal');
+  $modalTitle     = document.getElementById('modal-title');
+  $modalIframe    = document.getElementById('modal-iframe');
+  $modalOpenLink  = document.getElementById('modal-open-link');
 }
 
-function getCategoryLabel(category) {
-  return categoryLabelMap[category] || category || "未分類";
-}
-
-function getStatusLabel(status) {
-  return statusLabelMap[status] || String(status || "unknown").toUpperCase();
-}
-
-function compareDateDesc(a, b) {
-  return new Date(b.updatedAt || "1970-01-01") - new Date(a.updatedAt || "1970-01-01");
-}
-
-function compareDefault(a, b) {
-  const orderDiff = (a.order ?? 9999) - (b.order ?? 9999);
-  if (orderDiff !== 0) return orderDiff;
-  return (a.name || "").localeCompare(b.name || "", "zh-Hant");
-}
-
-function sortTools(tools, mode) {
-  const copied = [...tools];
-
-  switch (mode) {
-    case "name-asc":
-      return copied.sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "", "zh-Hant")
-      );
-
-    case "updated-desc":
-      return copied.sort(compareDateDesc);
-
-    case "status":
-      return copied.sort((a, b) => {
-        const statusDiff = (statusOrderMap[a.status] ?? 999) - (statusOrderMap[b.status] ?? 999);
-        if (statusDiff !== 0) return statusDiff;
-        return compareDefault(a, b);
-      });
-
-    case "default":
-    default:
-      return copied.sort(compareDefault);
-  }
-}
-
-function createToolCard(tool, options = {}) {
-  const article = document.createElement("article");
-  article.className = `card ${tool.featured ? "featured" : ""}`;
-
-  const tags = (tool.tags || [])
-    .map(tag => `<span class="tag">${escapeHtml(tag)}</span>`)
-    .join("");
-
-  const flags = [
-    tool.featured ? `<span class="featured-badge">FEATURED</span>` : "",
-    tool.isNew ? `<span class="new-badge">NEW</span>` : ""
-  ].join("");
-
-  const categoryLabel = getCategoryLabel(tool.category);
-  const statusLabel = getStatusLabel(tool.status);
-  const statusClass = `status-${tool.status || "draft"}`;
-
-  article.innerHTML = `
-    <div class="card-top">
-      <div class="card-title-group">
-        <div class="flag-row">${flags}</div>
-        <h2>${escapeHtml(tool.name)} <small>(${escapeHtml(tool.name_en || "")})</small></h2>
-      </div>
-      <span class="status-badge ${statusClass}">${statusLabel}</span>
-    </div>
-    <p>${escapeHtml(tool.description || "")}</p>
-    <div class="meta-row">
-      <span class="meta-pill">${escapeHtml(categoryLabel)}</span>
-      <span class="meta-pill">${tool.supportsIframe ? "可預覽" : "僅外部開啟"}</span>
-      ${tool.updatedAt ? `<span class="meta-pill">更新：${escapeHtml(tool.updatedAt)}</span>` : ""}
-    </div>
-    <div class="tag-row">${tags}</div>
-    <div class="actions">
-      <a href="${tool.path}" target="_blank" rel="noopener noreferrer">開啟</a>
-      ${
-        tool.supportsIframe
-          ? `<button data-src="${tool.path}" type="button">預覽</button>`
-          : `<button disabled type="button">不可預覽</button>`
-      }
-    </div>
-    ${options.showUpdatedText ? `<div class="updated-text">最後更新：${escapeHtml(tool.updatedAt || "未標記")}</div>` : ""}
-  `;
-
-  return article;
-}
-
-function bindPreviewButtons() {
-  document.querySelectorAll("button[data-src]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      frame.src = btn.dataset.src;
-    });
-  });
-}
-
-function renderFeaturedTools() {
-  const featuredTools = sortTools(
-    allTools.filter(tool => tool.featured),
-    "default"
-  );
-
-  featuredGrid.innerHTML = "";
-
-  if (!featuredTools.length) {
-    featuredGrid.innerHTML = `
-      <div class="empty-state">目前沒有標記為 featured 的工具。</div>
-    `;
-    return;
-  }
-
-  featuredTools.forEach(tool => {
-    featuredGrid.appendChild(createToolCard(tool));
-  });
-
-  bindPreviewButtons();
-}
-
-function getFilteredTools() {
-  const keyword = searchInput?.value.trim().toLowerCase() || "";
-
-  return allTools.filter(tool => {
-    const matchCategory =
-      activeCategory === "all" || tool.category === activeCategory;
-
-    const text = [
-      tool.name,
-      tool.name_en,
-      tool.description,
-      tool.category,
-      tool.status,
-      tool.updatedAt,
-      ...(tool.tags || [])
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    const matchKeyword = !keyword || text.includes(keyword);
-
-    return matchCategory && matchKeyword;
-  });
-}
-
-function renderTools(tools) {
-  toolGrid.innerHTML = "";
-
-  if (!tools.length) {
-    toolGrid.innerHTML = `
-      <div class="empty-state">
-        找不到符合條件的工具，請調整搜尋字詞或分類條件。
-      </div>
-    `;
-    resultCount.textContent = "0 個結果";
-    return;
-  }
-
-  tools.forEach(tool => {
-    toolGrid.appendChild(createToolCard(tool, { showUpdatedText: true }));
-  });
-
-  resultCount.textContent = `${tools.length} 個結果`;
-  bindPreviewButtons();
-}
-
-function refreshToolView() {
-  const filtered = getFilteredTools();
-  const sorted = sortTools(filtered, sortSelect?.value || "default");
-  renderTools(sorted);
-}
-
-function renderCategoryFilters() {
-  const categories = [...new Set(allTools.map(tool => tool.category).filter(Boolean))];
-  const categoryList = ["all", ...categories];
-
-  categoryFilters.innerHTML = "";
-
-  categoryList.forEach(category => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `filter-chip ${category === activeCategory ? "active" : ""}`;
-    btn.textContent = getCategoryLabel(category);
-
-    btn.addEventListener("click", () => {
-      activeCategory = category;
-      renderCategoryFilters();
-      refreshToolView();
-    });
-
-    categoryFilters.appendChild(btn);
-  });
-}
-
+/* ── Data Loading ───────────────────────────────────────────── */
 async function loadTools() {
-  try {
-    const res = await fetch("./tools.json");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  renderSkeletons($allGrid, 6);
 
-    allTools = await res.json();
-    renderFeaturedTools();
-    renderCategoryFilters();
-    refreshToolView();
-  } catch (error) {
-    const errorHtml = `
-      <div class="empty-state">
-        無法載入 tools.json，請檢查檔案路徑、JSON 格式與部署狀態。
-      </div>
-    `;
-    featuredGrid.innerHTML = errorHtml;
-    toolGrid.innerHTML = errorHtml;
-    console.error(error);
+  try {
+    const base = getBasePath();
+    const res  = await fetch(`${base}tools.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.tools = await res.json();
+  } catch (err) {
+    console.error('[Lobby] Failed to load tools.json:', err);
+    $allGrid.innerHTML = errorState('無法載入工具清單，請確認 tools.json 是否存在。');
+    return;
+  }
+
+  buildCategoryFilters();
+  render();
+}
+
+/* Derive the lobby's base path so relative links work from subdirs */
+function getBasePath() {
+  const path = location.pathname;
+  const depth = (path.match(/\//g) || []).length - 1;
+  return depth > 0 ? '../'.repeat(depth) : './';
+}
+
+/* ── Rendering ──────────────────────────────────────────────── */
+function render() {
+  const visible = filter(state.tools);
+  const sorted  = sort(visible);
+
+  const featured = sorted.filter(t => t.featured);
+  const all      = sorted;
+
+  // Featured section
+  if (featured.length && state.query === '' && state.category === 'all') {
+    $featuredSection && ($featuredSection.hidden = false);
+    $featuredGrid && renderCards($featuredGrid, featured, true);
+  } else {
+    $featuredSection && ($featuredSection.hidden = true);
+  }
+
+  // All tools
+  if ($toolCount) $toolCount.textContent = all.length;
+
+  if (all.length === 0) {
+    $allGrid.innerHTML = emptyState();
+  } else {
+    renderCards($allGrid, all, false);
   }
 }
 
-clearBtn?.addEventListener("click", () => {
-  frame.src = "";
-});
+function renderCards($grid, tools, featured) {
+  $grid.innerHTML = tools.map(t => cardHTML(t, featured)).join('');
 
-searchInput?.addEventListener("input", () => {
-  refreshToolView();
-});
+  // Bind preview buttons
+  $grid.querySelectorAll('[data-preview]').forEach(btn => {
+    btn.addEventListener('click', () => openPreview(btn.dataset.preview));
+  });
+}
 
-sortSelect?.addEventListener("change", () => {
-  refreshToolView();
-});
+function cardHTML(t, featured = false) {
+  const icon    = CATEGORY_ICONS[t.category] || CATEGORY_ICONS.default;
+  const badgeStatus = `<span class="badge ${STATUS_CLASS[t.status] || 'badge--draft'}" aria-label="狀態">${t.status}</span>`;
+  const badgeNew     = t.isNew      ? `<span class="badge badge--new">NEW</span>` : '';
+  const badgeFeat    = t.featured && !featured ? `<span class="badge badge--featured">精選</span>` : '';
 
-resetFilters?.addEventListener("click", () => {
-  activeCategory = "all";
-  if (searchInput) searchInput.value = "";
-  if (sortSelect) sortSelect.value = "default";
-  renderCategoryFilters();
-  refreshToolView();
-});
+  const tags = (t.tags || []).slice(0, 3).map(tag =>
+    `<span class="tag">${escHtml(tag)}</span>`
+  ).join('');
 
-loadTools();
+  const previewBtn = t.supportsIframe
+    ? `<button class="btn btn--ghost btn--sm" data-preview="${escAttr(t.path)}" aria-label="預覽 ${escAttr(t.name)}">
+         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
+         預覽
+       </button>`
+    : '';
+
+  const base = getBasePath();
+  return `
+  <article class="card${featured ? ' card--featured' : ''}" role="article" aria-label="${escAttr(t.name)}">
+    <div class="card__header">
+      <div class="card__icon" aria-hidden="true">${icon}</div>
+      <div class="card__badges">
+        ${badgeNew}${badgeFeat}${badgeStatus}
+      </div>
+    </div>
+    <div class="card__body">
+      <h3 class="card__name">
+        ${escHtml(t.name)}
+        <span class="card__name-en">${escHtml(t.name_en || '')}</span>
+      </h3>
+      <p class="card__desc">${escHtml(t.description || '')}</p>
+    </div>
+    ${tags ? `<div class="card__tags">${tags}</div>` : ''}
+    <footer class="card__footer">
+      <a href="${base}${t.path.replace(/^\.\//, '')}"
+         class="btn btn--primary btn--sm"
+         target="_blank"
+         rel="noopener noreferrer"
+         aria-label="開啟 ${escAttr(t.name)}">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/><path d="M13 1h2v2m0-2L8 8"/></svg>
+        開啟
+      </a>
+      ${previewBtn}
+    </footer>
+  </article>`;
+}
+
+/* ── Filter / Sort helpers ──────────────────────────────────── */
+function filter(tools) {
+  const q   = state.query.toLowerCase().trim();
+  const cat = state.category;
+
+  return tools.filter(t => {
+    const matchCat = cat === 'all' || t.category === cat;
+    if (!matchCat) return false;
+    if (!q) return true;
+
+    return (
+      t.name?.toLowerCase().includes(q) ||
+      t.name_en?.toLowerCase().includes(q) ||
+      t.description?.toLowerCase().includes(q) ||
+      (t.tags || []).some(tag => tag.toLowerCase().includes(q))
+    );
+  });
+}
+
+function sort(tools) {
+  const key = state.sort;
+  return [...tools].sort((a, b) => {
+    if (key === 'order')     return (a.order ?? 999) - (b.order ?? 999);
+    if (key === 'name')      return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+    if (key === 'updatedAt') return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+    return 0;
+  });
+}
+
+/* ── Category filter buttons (dynamic build) ────────────────── */
+function buildCategoryFilters() {
+  if (!$filterBtns || !$filterBtns.length) return; // static buttons already in HTML
+
+  const categories = ['all', ...new Set(state.tools.map(t => t.category).filter(Boolean))];
+  const container  = document.getElementById('filter-group');
+  if (!container) return;
+
+  container.innerHTML = categories.map(cat => `
+    <button class="filter-btn${cat === 'all' ? ' is-active' : ''}"
+            data-category="${escAttr(cat)}"
+            aria-pressed="${cat === 'all' ? 'true' : 'false'}">
+      ${cat === 'all' ? '全部' : cat}
+    </button>
+  `).join('');
+
+  container.querySelectorAll('[data-category]').forEach(btn => {
+    btn.addEventListener('click', () => setCategory(btn.dataset.category));
+  });
+}
+
+/* ── Event Bindings ─────────────────────────────────────────── */
+function bindEvents() {
+  // Search
+  if ($searchInput) {
+    let debounceTimer;
+    $searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.query = $searchInput.value;
+        render();
+      }, 180);
+    });
+  }
+
+  // Sort
+  if ($sortSelect) {
+    $sortSelect.addEventListener('change', () => {
+      state.sort = $sortSelect.value;
+      render();
+    });
+  }
+
+  // Category (static buttons)
+  document.querySelectorAll('[data-category]').forEach(btn => {
+    btn.addEventListener('click', () => setCategory(btn.dataset.category));
+  });
+
+  // Modal close
+  const closeBtn = document.getElementById('modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', closePreview);
+
+  if ($modalOverlay) {
+    $modalOverlay.addEventListener('click', e => {
+      if (e.target === $modalOverlay) closePreview();
+    });
+  }
+
+  // Keyboard: Escape closes modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closePreview();
+  });
+}
+
+function setCategory(cat) {
+  state.category = cat;
+
+  document.querySelectorAll('[data-category]').forEach(btn => {
+    const active = btn.dataset.category === cat;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+
+  render();
+}
+
+/* ── Preview Modal ──────────────────────────────────────────── */
+function openPreview(path) {
+  if (!$modalOverlay || !$modalIframe) return;
+
+  const tool  = state.tools.find(t => t.path === path);
+  const label = tool ? tool.name : 'Tool Preview';
+  const base  = getBasePath();
+  const url   = `${base}${path.replace(/^\.\//, '')}`;
+
+  if ($modalTitle)    $modalTitle.textContent = label;
+  if ($modalOpenLink) { $modalOpenLink.href = url; }
+  $modalIframe.src = url;
+
+  $modalOverlay.classList.add('is-open');
+  $modalOverlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+
+  const closeBtn = document.getElementById('modal-close');
+  if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
+}
+
+function closePreview() {
+  if (!$modalOverlay) return;
+  $modalOverlay.classList.remove('is-open');
+  $modalOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+
+  // Delay src clear so exit animation plays
+  setTimeout(() => {
+    if ($modalIframe) $modalIframe.src = 'about:blank';
+  }, 300);
+}
+
+/* ── Skeleton Loader ────────────────────────────────────────── */
+function renderSkeletons($grid, count) {
+  if (!$grid) return;
+  $grid.innerHTML = Array.from({ length: count }, () => `
+    <div class="card" aria-hidden="true">
+      <div class="card__header">
+        <div class="skeleton" style="width:44px;height:44px;border-radius:var(--radius)"></div>
+        <div class="skeleton" style="width:60px;height:22px;border-radius:999px"></div>
+      </div>
+      <div class="card__body">
+        <div class="skeleton" style="width:70%;height:18px;margin-bottom:8px"></div>
+        <div class="skeleton" style="width:100%;height:14px;margin-bottom:4px"></div>
+        <div class="skeleton" style="width:80%;height:14px"></div>
+      </div>
+      <div class="card__footer" style="border-top:1px solid var(--color-border);padding-top:12px">
+        <div class="skeleton" style="flex:1;height:30px"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── Template helpers ───────────────────────────────────────── */
+function emptyState() {
+  return `
+    <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state__icon">🔍</div>
+      <h3 class="empty-state__title">找不到相符的工具</h3>
+      <p>試著換個關鍵字，或切換到「全部」分類。</p>
+    </div>`;
+}
+
+function errorState(msg) {
+  return `
+    <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state__icon">⚠️</div>
+      <h3 class="empty-state__title">載入失敗</h3>
+      <p>${escHtml(msg)}</p>
+    </div>`;
+}
+
+/* ── Active nav highlight ───────────────────────────────────── */
+function highlightCurrentNav() {
+  const path = location.pathname;
+  document.querySelectorAll('.nav__link').forEach(link => {
+    const href = link.getAttribute('href');
+    if (!href) return;
+    // Normalize: remove trailing slash / index.html
+    const norm = s => s.replace(/\/index\.html$/, '/').replace(/\/$/, '') || '/';
+    link.classList.toggle('is-active', norm(href) === norm(path));
+  });
+}
+
+/* ── XSS helpers ────────────────────────────────────────────── */
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escAttr(s) { return escHtml(s); }
