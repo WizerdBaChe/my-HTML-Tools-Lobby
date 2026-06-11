@@ -65,6 +65,8 @@ async function loadTools() {
 
   try {
     const base = getBasePath();
+    console.log('[Lobby] base =', base);          // ← 加這行
+    console.log('[Lobby] fetching', `${base}tools.json`);  // ← 加這行
     const res  = await fetch(`${base}tools.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     state.tools = await res.json();
