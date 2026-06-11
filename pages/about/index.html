@@ -2,120 +2,140 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>關於本站 | HTML 工具大廳</title>
-  <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, "Noto Sans TC", sans-serif;
-      background: #0f172a;
-      color: #e5e7eb;
-      line-height: 1.75;
-    }
-    .container {
-      width: min(960px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 32px 0 48px;
-    }
-    .nav {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 24px;
-    }
-    .nav a {
-      display: inline-block;
-      padding: 10px 14px;
-      border-radius: 12px;
-      text-decoration: none;
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #e5e7eb;
-    }
-    .hero, .section {
-      background: #111827;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-    h1, h2, h3 { margin-top: 0; }
-    p, li { color: #cbd5e1; }
-    ul { margin: 0; padding-left: 20px; }
-    code {
-      background: #0f172a;
-      padding: 2px 6px;
-      border-radius: 8px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-    }
-    .mini-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 16px;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="關於 HTML Tools Lobby — 設計理念、使用方式與貢獻指引。" />
+  <title>關於 — HTML Tools Lobby</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="../../assets/css/main.css" />
 </head>
 <body>
+
+<nav class="nav" role="navigation" aria-label="主導覽">
+  <div class="container nav__inner">
+    <a href="../../" class="nav__logo" aria-label="HTML Tools Lobby 首頁">
+      <div class="nav__logo-icon" aria-hidden="true">⚒</div>
+      <span>Tools Lobby</span>
+    </a>
+    <ul class="nav__links" role="list">
+      <li>
+        <a href="../../" class="nav__link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M6 15V9h4v6"/></svg>
+          <span>大廳</span>
+        </a>
+      </li>
+      <li>
+        <a href="./" class="nav__link is-active" aria-current="page">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 7v4m0-6h.01"/></svg>
+          <span>關於</span>
+        </a>
+      </li>
+      <li>
+        <a href="../changelog/" class="nav__link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M5 6h6M5 9h4"/></svg>
+          <span>更新紀錄</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main-content" role="main">
   <div class="container">
-    <nav class="nav">
-      <a href="../../">回到首頁</a>
-      <a href="../changelog/">查看更新紀錄</a>
-    </nav>
 
-    <section class="hero">
-      <h1>關於本站 (About)</h1>
-      <p>這是一個以 GitHub Pages 為基礎的靜態 HTML 工具集合站，用來集中整理多個獨立小工具。</p>
-      <p>首頁作為 Lobby，負責讀取 <code>tools.json</code>，並提供精選工具、搜尋、分類、排序與 iframe 預覽功能。</p>
-    </section>
+    <header class="page-header">
+      <h1 class="page-header__title">關於 HTML Tools Lobby</h1>
+      <p class="page-header__sub">設計理念、使用方式與維護指引</p>
+    </header>
 
-    <section class="section">
-      <h2>本站目標</h2>
-      <ul>
-        <li>把零散的小工具集中到同一個 repo 管理。</li>
-        <li>讓每個工具保有獨立頁面與清楚路徑。</li>
-        <li>用一致的卡片式入口降低維護成本。</li>
-        <li>維持靜態站架構，避免不必要的複雜化。</li>
-      </ul>
-    </section>
+    <div style="display: grid; grid-template-columns: 1fr min(680px, 100%); gap: 0; justify-content: start;">
+    <div class="prose">
 
-    <section class="section">
-      <h2>目前功能</h2>
-      <div class="grid">
-        <div class="mini-card">
-          <h3>Tool Cards</h3>
-          <p>首頁自動根據 <code>tools.json</code> 產生工具卡片。</p>
-        </div>
-        <div class="mini-card">
-          <h3>Featured</h3>
-          <p>可指定精選工具顯示在首頁上方。</p>
-        </div>
-        <div class="mini-card">
-          <h3>Filter & Sort</h3>
-          <p>支援搜尋、分類篩選與排序。</p>
-        </div>
-        <div class="mini-card">
-          <h3>Status</h3>
-          <p>支援 READY、BETA、DRAFT、NEW 等標記。</p>
+      <h2>專案簡介</h2>
+      <p>
+        HTML Tools Lobby 是一個以 GitHub Pages 為基礎的靜態工具集合站，
+        目標是把多個獨立的小工具整理到同一個靜態網站中，
+        降低工具分散、路徑混亂與維護成本。
+      </p>
+      <p>
+        大廳頁透過讀取 <code style="font-family: monospace; background: var(--color-surface-2); padding: 2px 6px; border-radius: 4px; font-size: .875em;">tools.json</code>
+        自動產生工具卡片，支援搜尋、分類篩選、排序與精選展示，完全不需要後端服務。
+      </p>
+
+      <h2>設計原則</h2>
+
+      <div class="info-card">
+        <div class="info-card__icon">⚡</div>
+        <div>
+          <h3 class="info-card__title" style="margin-top:0">靜態優先</h3>
+          <p class="info-card__desc">優先使用靜態 HTML / CSS / JavaScript，不依賴後端，不引入不必要的框架。</p>
         </div>
       </div>
-    </section>
 
-    <section class="section">
-      <h2>使用方式</h2>
+      <div class="info-card">
+        <div class="info-card__icon">🧩</div>
+        <div>
+          <h3 class="info-card__title" style="margin-top:0">工具彼此獨立</h3>
+          <p class="info-card__desc">每個工具位於 <code style="font-family: monospace; font-size: .875em;">tools/&lt;tool-id&gt;/index.html</code>，各自管理資源，避免互相污染。</p>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__icon">📋</div>
+        <div>
+          <h3 class="info-card__title" style="margin-top:0">單一資料來源</h3>
+          <p class="info-card__desc"><code style="font-family: monospace; font-size: .875em;">tools.json</code> 是工具卡片、精選區塊、排序、狀態標記的唯一資料來源。新增或調整工具只需更新此檔案。</p>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__icon">🚀</div>
+        <div>
+          <h3 class="info-card__title" style="margin-top:0">MVP 優先</h3>
+          <p class="info-card__desc">先做最小可用版，確認不破壞既有結構後，再考慮功能擴充與視覺升級。</p>
+        </div>
+      </div>
+
+      <h2>新增工具流程</h2>
       <ul>
-        <li>從首頁瀏覽精選工具與全部工具。</li>
-        <li>使用搜尋框、分類按鈕與排序快速定位工具。</li>
-        <li>點擊「開啟」進入獨立工具頁。</li>
-        <li>若工具支援，可直接在首頁預覽。</li>
+        <li>建立工具資料夾：<code style="font-family: monospace; font-size: .875em;">tools/&lt;tool-id&gt;/index.html</code></li>
+        <li>在 <code style="font-family: monospace; font-size: .875em;">tools.json</code> 新增一筆工具資料</li>
+        <li>填寫必要欄位：<code style="font-family: monospace; font-size: .875em;">id</code>、<code style="font-family: monospace; font-size: .875em;">name</code>、<code style="font-family: monospace; font-size: .875em;">path</code>、<code style="font-family: monospace; font-size: .875em;">category</code>、<code style="font-family: monospace; font-size: .875em;">status</code></li>
+        <li>從大廳確認卡片正常顯示、搜尋與預覽功能可用</li>
+        <li>若有明顯功能變更，補到更新紀錄頁</li>
       </ul>
-    </section>
+
+      <h2>工具狀態說明</h2>
+      <ul>
+        <li><span class="badge badge--ready" style="vertical-align:middle;margin-right:8px">READY</span>功能穩定，可正常使用</li>
+        <li><span class="badge badge--beta" style="vertical-align:middle;margin-right:8px">BETA</span>基本功能可用，仍在持續測試中</li>
+        <li><span class="badge badge--draft" style="vertical-align:middle;margin-right:8px">DRAFT</span>開發中，尚未正式發布</li>
+      </ul>
+
+      <h2>相關文件</h2>
+      <ul>
+        <li><a href="../../docs/MAINTENANCE.md" target="_blank" rel="noopener">維護與更新原則 (MAINTENANCE.md)</a></li>
+        <li><a href="../../tools.json" target="_blank" rel="noopener">工具資料清單 (tools.json)</a></li>
+        <li><a href="../changelog/">更新紀錄</a></li>
+      </ul>
+
+    </div>
+    </div>
+
   </div>
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="container footer__inner">
+    <p class="footer__copy">HTML Tools Lobby — 以靜態 HTML 驅動的工具集合站</p>
+    <nav class="footer__links" aria-label="頁尾導覽">
+      <a href="../../" class="footer__link">大廳</a>
+      <a href="../changelog/" class="footer__link">更新紀錄</a>
+      <a href="../../tools.json" class="footer__link" target="_blank" rel="noopener">tools.json</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../../assets/js/lobby.js"></script>
 </body>
 </html>
