@@ -2,86 +2,167 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HTML 工具大廳</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="HTML Tools Lobby — 集中管理各種靜態 HTML 小工具，支援搜尋、分類篩選、排序與預覽。" />
+  <title>HTML Tools Lobby</title>
+
+  <!-- Preload critical font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+
   <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
 <body>
-  <header class="hero">
-    <h1>HTML 工具大廳</h1>
-    <p>集中管理各種 HTML 小工具，支援卡片瀏覽、分類篩選、排序、精選工具與內嵌預覽。</p>
-    <div class="hero-links">
-      <a href="./pages/about/">關於本站</a>
-      <a href="./pages/changelog/">更新紀錄</a>
-    </div>
-  </header>
 
-  <main class="layout">
-    <section>
-      <section class="featured-panel">
-        <div class="panel-head">
-          <h2>精選工具</h2>
-          <span class="panel-note">由 tools.json 的 featured 控制</span>
-        </div>
-        <div id="featuredGrid" class="featured-grid"></div>
-      </section>
+<!-- ── Navigation ───────────────────────────────────────────── -->
+<nav class="nav" role="navigation" aria-label="主導覽">
+  <div class="container nav__inner">
+    <a href="./" class="nav__logo" aria-label="HTML Tools Lobby 首頁">
+      <div class="nav__logo-icon" aria-hidden="true">⚒</div>
+      <span>Tools Lobby</span>
+    </a>
 
-      <div class="toolbar-grid">
-        <div class="toolbar">
-          <label class="control-label" for="searchInput">搜尋</label>
-          <input id="searchInput" type="text" placeholder="搜尋名稱、描述、標籤、狀態..." />
+    <ul class="nav__links" role="list">
+      <li>
+        <a href="./" class="nav__link is-active" aria-current="page">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M6 15V9h4v6"/></svg>
+          <span>大廳</span>
+        </a>
+      </li>
+      <li>
+        <a href="./pages/about/" class="nav__link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 7v4m0-6h.01"/></svg>
+          <span>關於</span>
+        </a>
+      </li>
+      <li>
+        <a href="./pages/changelog/" class="nav__link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M5 6h6M5 9h4"/></svg>
+          <span>更新紀錄</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────── -->
+<header class="hero" role="banner">
+  <div class="container">
+    <div class="hero__badge" aria-hidden="true">🛠 靜態工具集合站</div>
+    <h1 class="hero__title">HTML Tools Lobby</h1>
+    <p class="hero__subtitle">集中管理各種獨立的靜態 HTML 小工具，支援搜尋、分類篩選與快速預覽。</p>
+  </div>
+</header>
+
+<!-- ── Main ─────────────────────────────────────────────────── -->
+<main id="main-content" role="main">
+  <div class="container">
+
+    <!-- Toolbar -->
+    <section aria-label="搜尋與篩選">
+      <div class="toolbar" role="search">
+        <!-- Search -->
+        <div class="search-box">
+          <svg class="search-box__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5"/><path d="m11 11 3 3"/></svg>
+          <input
+            id="search-input"
+            class="search-box__input"
+            type="search"
+            placeholder="搜尋工具名稱、描述或標籤…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="搜尋工具"
+          />
         </div>
 
-        <div class="toolbar">
-          <label class="control-label" for="sortSelect">排序</label>
-          <select id="sortSelect">
-            <option value="default">預設排序</option>
-            <option value="name-asc">名稱 A-Z</option>
-            <option value="updated-desc">最近更新優先</option>
-            <option value="status">狀態排序</option>
-          </select>
-        </div>
+        <!-- Sort -->
+        <label for="sort-select" class="sr-only">排序方式</label>
+        <select id="sort-select" class="sort-select" aria-label="排序方式">
+          <option value="order">預設排序</option>
+          <option value="name">名稱排序</option>
+          <option value="updatedAt">最近更新</option>
+        </select>
       </div>
 
-      <section class="filters-panel">
-        <div class="filters-head">
-          <h2>分類篩選</h2>
-          <button id="resetFilters" type="button">重設</button>
-        </div>
-        <div id="categoryFilters" class="filter-row"></div>
-      </section>
-
-      <section class="legend-panel">
-        <h2>狀態說明</h2>
-        <div class="legend-row">
-          <span class="status-badge status-ready">READY</span>
-          <span>可正常使用</span>
-          <span class="status-badge status-beta">BETA</span>
-          <span>可使用，但可能仍在調整</span>
-          <span class="status-badge status-draft">DRAFT</span>
-          <span>雛形或開發中</span>
-          <span class="new-badge">NEW</span>
-          <span>近期加入或剛更新</span>
-        </div>
-      </section>
-
-      <section class="panel-head">
-        <h2>全部工具</h2>
-        <span id="resultCount" class="panel-note"></span>
-      </section>
-
-      <section class="tool-grid" id="toolGrid"></section>
+      <!-- Category filter (populated by JS) -->
+      <div id="filter-group" class="filter-group" role="group" aria-label="分類篩選">
+        <!-- Populated by lobby.js buildCategoryFilters() -->
+        <button class="filter-btn is-active" data-category="all" aria-pressed="true">全部</button>
+      </div>
     </section>
 
-    <aside class="preview-panel">
-      <div class="preview-bar">
-        <span>工具預覽區</span>
-        <button id="clearPreview" type="button">關閉預覽</button>
+    <!-- Featured Section -->
+    <section id="section-featured" class="section" aria-label="精選工具" hidden>
+      <div class="section__head">
+        <h2 class="section__title">⭐ 精選工具</h2>
+        <div class="divider" aria-hidden="true"></div>
       </div>
-      <iframe id="previewFrame" src="" title="工具預覽"></iframe>
-    </aside>
-  </main>
+      <div id="featured-grid" class="featured-grid" role="list" aria-label="精選工具列表"></div>
+    </section>
 
-  <script src="./assets/js/lobby.js"></script>
+    <!-- All Tools Section -->
+    <section id="section-all" class="section" aria-label="全部工具">
+      <div class="section__head">
+        <h2 class="section__title">全部工具</h2>
+        <span id="tool-count" class="section__count" aria-live="polite" aria-label="工具數量">0</span>
+        <div class="divider" aria-hidden="true"></div>
+      </div>
+      <div id="all-grid" class="tools-grid" role="list" aria-label="工具列表"></div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ── Footer ───────────────────────────────────────────────── -->
+<footer class="footer" role="contentinfo">
+  <div class="container footer__inner">
+    <p class="footer__copy">HTML Tools Lobby — 以靜態 HTML 驅動的工具集合站</p>
+    <nav class="footer__links" aria-label="頁尾導覽">
+      <a href="./pages/about/"     class="footer__link">關於</a>
+      <a href="./pages/changelog/" class="footer__link">更新紀錄</a>
+      <a href="./tools.json"       class="footer__link" target="_blank" rel="noopener">tools.json</a>
+    </nav>
+  </div>
+</footer>
+
+<!-- ── Preview Modal ────────────────────────────────────────── -->
+<div
+  id="modal-overlay"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-title"
+  aria-hidden="true"
+>
+  <div id="preview-modal" class="modal">
+    <header class="modal__header">
+      <span id="modal-title" class="modal__title">工具預覽</span>
+      <button id="modal-close" class="modal__close" aria-label="關閉預覽">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m2 2 12 12M14 2 2 14"/></svg>
+      </button>
+    </header>
+    <div class="modal__iframe-wrap">
+      <iframe
+        id="modal-iframe"
+        class="modal__iframe"
+        src="about:blank"
+        title="工具預覽視窗"
+        loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+      ></iframe>
+    </div>
+    <footer class="modal__footer">
+      <a id="modal-open-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn--primary">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/><path d="M13 1h2v2m0-2L8 8"/></svg>
+        在新頁開啟
+      </a>
+      <button id="modal-close-btn" class="btn btn--ghost" onclick="document.getElementById('modal-close').click()">關閉</button>
+    </footer>
+  </div>
+</div>
+
+<script src="./assets/js/lobby.js"></script>
 </body>
 </html>
