@@ -2,88 +2,53 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>404 | 找不到頁面</title>
-  <style>
-    :root {
-      color-scheme: dark;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(135deg, #0f172a, #111827);
-      color: #e5e7eb;
-      font-family: Arial, "Noto Sans TC", sans-serif;
-      padding: 24px;
-    }
-
-    .card {
-      width: min(680px, 100%);
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 32px 24px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
-    }
-
-    h1 {
-      margin-top: 0;
-      font-size: 2rem;
-    }
-
-    p {
-      line-height: 1.7;
-      color: #cbd5e1;
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-
-    .btn {
-      display: inline-block;
-      padding: 10px 16px;
-      border-radius: 12px;
-      text-decoration: none;
-      background: #2563eb;
-      color: white;
-      border: 1px solid #3b82f6;
-    }
-
-    .btn.secondary {
-      background: transparent;
-      color: #cbd5e1;
-      border-color: #475569;
-    }
-
-    code {
-      background: #0f172a;
-      padding: 2px 6px;
-      border-radius: 8px;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>找不到頁面 — HTML Tools Lobby</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
 <body>
-  <main class="card">
-    <h1>404：找不到頁面</h1>
-    <p>你要找的頁面可能不存在、路徑打錯，或是工具位置已經被移動。</p>
-    <p>如果你是手動輸入網址，請檢查路徑；如果你是從舊書籤進來，可以先回到大廳頁重新進入工具。</p>
-    <p>建議回到 <code>index.html</code> 對應的 Lobby 首頁，再從卡片重新開啟工具。</p>
 
-    <div class="actions">
-      <a class="btn" href="./">回到首頁</a>
-      <a class="btn secondary" href="./pages/about/">關於本站</a>
+<nav class="nav" role="navigation" aria-label="主導覽">
+  <div class="container nav__inner">
+    <a href="./" class="nav__logo" aria-label="HTML Tools Lobby 首頁">
+      <div class="nav__logo-icon" aria-hidden="true">⚒</div>
+      <span>Tools Lobby</span>
+    </a>
+    <ul class="nav__links" role="list">
+      <li><a href="./" class="nav__link"><span>大廳</span></a></li>
+      <li><a href="./pages/about/" class="nav__link"><span>關於</span></a></li>
+      <li><a href="./pages/changelog/" class="nav__link"><span>更新紀錄</span></a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main-content" role="main">
+  <div class="container">
+    <div class="empty-state" style="padding-top: 6rem; padding-bottom: 6rem;">
+      <div class="empty-state__icon" style="font-size: 5rem; opacity: 1;">404</div>
+      <h1 class="empty-state__title" style="font-size: 2rem; margin-bottom: 0.75rem;">找不到頁面</h1>
+      <p style="font-size: 1rem; margin-bottom: 2rem; max-width: 400px; margin-inline: auto;">
+        你要找的頁面不存在，或路徑有誤。請回到大廳繼續瀏覽工具。
+      </p>
+      <a href="./" class="btn btn--primary" style="display:inline-flex; height:44px; padding: 0 1.5rem; font-size: 1rem;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/></svg>
+        回到大廳
+      </a>
     </div>
-  </main>
+  </div>
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="container footer__inner">
+    <p class="footer__copy">HTML Tools Lobby</p>
+    <nav class="footer__links" aria-label="頁尾導覽">
+      <a href="./pages/about/" class="footer__link">關於</a>
+      <a href="./pages/changelog/" class="footer__link">更新紀錄</a>
+    </nav>
+  </div>
+</footer>
+
 </body>
 </html>
