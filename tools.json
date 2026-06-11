@@ -10,8 +10,23 @@
     "supportsIframe": true,
     "status": "ready",
     "featured": true,
-    "isNew": true,
+    "isNew": false,
     "order": 1,
+    "updatedAt": "2026-06-11"
+  },
+  {
+    "id": "Image-Color-Picker",
+    "name": "IG 圖片填充器",
+    "name_en": "Image-Color-Picker",
+    "description": "滴管抓取圖片中顏色，並顯示色號",
+    "path": "./tools/Image-Color-Picker/",
+    "category": "image",
+    "tags": ["color", "image", "placeholder"],
+    "supportsIframe": true,
+    "status": "ready",
+    "featured": true,
+    "isNew": true,
+    "order": 2,
     "updatedAt": "2026-06-11"
   }
 ]
