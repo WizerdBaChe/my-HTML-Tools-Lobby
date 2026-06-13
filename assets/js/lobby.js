@@ -1,5 +1,5 @@
 /**
- * HTML Tools Lobby — lobby.js
+ * HTML Tools Lobby — lobby.js (防呆安全修正版)
  * Data flow: fetch tools.json → render featured + all tools
  * Handles: search, category filter, sort, iframe preview modal
  */
@@ -38,7 +38,13 @@ let $searchInput, $sortSelect, $filterBtns, $featuredSection, $featuredGrid,
 /* ── Bootstrap ──────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   cacheDOM();
-  loadTools();
+  
+  // 【防呆修正】只有當頁面存在主要的大廳網格時，才初始化大廳專用的資料載入與事件綁定
+  if ($allGrid) {
+    loadTools();
+  }
+  
+  // 基礎事件與導覽列標明不受頁面限制，皆可安全執行
   bindEvents();
   highlightCurrentNav();
 });
@@ -61,7 +67,8 @@ function cacheDOM() {
 
 /* ── Data Loading ───────────────────────────────────────────── */
 async function loadTools() {
-  renderSkeletons($allGrid, 6);
+  // 【防呆修正】確保網格存在才渲染骨架屏
+  if ($allGrid) renderSkeletons($allGrid, 6);
 
   try {
     const base = getBasePath();
@@ -70,7 +77,9 @@ async function loadTools() {
     state.tools = await res.json();
   } catch (err) {
     console.error('[Lobby] Failed to load tools.json:', err);
-    $allGrid.innerHTML = errorState('無法載入工具清單，請確認 tools.json 是否存在。');
+    if ($allGrid) {
+      $allGrid.innerHTML = errorState('無法載入工具清單，請確認 tools.json 是否存在。');
+    }
     return;
   }
 
@@ -80,13 +89,10 @@ async function loadTools() {
 
 /* Derive the lobby's base path so relative links work from subdirs */
 function getBasePath() {
-  // 找到 lobby.js 所在的 assets/js/ 目錄，
-  // 往上兩層就是 repo 根目錄，不受 repo 名稱影響
   const script = document.querySelector('script[src*="lobby.js"]');
   if (script) {
     return new URL('../../', new URL(script.src, location.href)).href;
   }
-  // fallback：從目前頁面的 pathname 找到 index.html 所在目錄
   return location.href.replace(/\/[^/]*$/, '/');
 }
 
@@ -109,14 +115,18 @@ function render() {
   // All tools
   if ($toolCount) $toolCount.textContent = all.length;
 
-  if (all.length === 0) {
-    $allGrid.innerHTML = emptyState();
-  } else {
-    renderCards($allGrid, all, false);
+  // 【防呆修正】確保網格存在才渲染主要卡片區
+  if ($allGrid) {
+    if (all.length === 0) {
+      $allGrid.innerHTML = emptyState();
+    } else {
+      renderCards($allGrid, all, false);
+    }
   }
 }
 
 function renderCards($grid, tools, featured) {
+  if (!$grid) return;
   $grid.innerHTML = tools.map(t => cardHTML(t, featured)).join('');
 
   // Bind preview buttons
@@ -204,7 +214,7 @@ function sort(tools) {
 
 /* ── Category filter buttons (dynamic build) ────────────────── */
 function buildCategoryFilters() {
-  if (!$filterBtns || !$filterBtns.length) return; // static buttons already in HTML
+  if (!$filterBtns || !$filterBtns.length) return;
 
   const categories = ['all', ...new Set(state.tools.map(t => t.category).filter(Boolean))];
   const container  = document.getElementById('filter-group');
@@ -305,7 +315,6 @@ function closePreview() {
   $modalOverlay.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
 
-  // Delay src clear so exit animation plays
   setTimeout(() => {
     if ($modalIframe) $modalIframe.src = 'about:blank';
   }, 300);
@@ -357,7 +366,6 @@ function highlightCurrentNav() {
   document.querySelectorAll('.nav__link').forEach(link => {
     const href = link.getAttribute('href');
     if (!href) return;
-    // Normalize: remove trailing slash / index.html
     const norm = s => s.replace(/\/index\.html$/, '/').replace(/\/$/, '') || '/';
     link.classList.toggle('is-active', norm(href) === norm(path));
   });
