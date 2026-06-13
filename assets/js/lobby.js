@@ -145,6 +145,7 @@ function cardHTML(t, featured = false) {
     `<span class="tag">${escHtml(tag)}</span>`
   ).join('');
 
+  // 預覽按鈕邏輯保持不變
   const previewBtn = t.supportsIframe
     ? `<button class="btn btn--ghost btn--sm" data-preview="${escAttr(t.path)}" aria-label="預覽 ${escAttr(t.name)}">
          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
@@ -153,6 +154,11 @@ function cardHTML(t, featured = false) {
     : '';
 
   const base = getBasePath();
+  
+  // 💡 【修正核心】判斷是否為外部絕對網址
+  const isExternalUrl = t.path.startsWith('http://') || t.path.startsWith('https://');
+  const finalUrl = isExternalUrl ? t.path : `${base}${t.path.replace(/^\.\//, '')}`;
+
   return `
   <article class="card${featured ? ' card--featured' : ''}" role="article" aria-label="${escAttr(t.name)}">
     <div class="card__header">
@@ -170,7 +176,7 @@ function cardHTML(t, featured = false) {
     </div>
     ${tags ? `<div class="card__tags">${tags}</div>` : ''}
     <footer class="card__footer">
-      <a href="${base}${t.path.replace(/^\.\//, '')}"
+      <a href="${escAttr(finalUrl)}"
          class="btn btn--primary btn--sm"
          target="_blank"
          rel="noopener noreferrer"
