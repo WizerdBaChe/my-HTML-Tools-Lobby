@@ -26,6 +26,7 @@
 - `NEW / FEATURED` 標記。
 - 支援 iframe 預覽模式。
 - 支援自訂 `404.html` 錯誤頁。
+- 支援外部連結工具（獨立部署於其他 repo 或網址）。
 
 ## 專案結構
 
@@ -99,7 +100,7 @@
 - `name`：中文名稱。
 - `name_en`：英文名稱。
 - `description`：工具描述。
-- `path`：工具路徑。
+- `path`：工具路徑。可為站內相對路徑（`./tools/my-tool/`）或完整外部 URL（`https://example.github.io/my-tool/`）。
 - `category`：工具分類。
 - `tags`：搜尋與標記用標籤。
 - `supportsIframe`：是否支援首頁預覽。

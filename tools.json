@@ -43,5 +43,20 @@
     "isNew": true,
     "order": 3,
     "updatedAt": "2026-06-11"
+  },
+  {
+  "id": "archlens",
+  "name": "檔案結構快速產生器",
+  "name_en": "ArchLens Web",
+  "description": "專案目錄結構掃描與視覺化工具，支援多主題切換。",
+  "path": "https://wizerdbache.github.io/ArchLens_Web/",
+  "category": "developer",
+  "tags": ["architecture", "tree", "visualizer", "react"],
+  "supportsIframe": false,
+  "status": "ready",
+  "featured": true,
+  "isNew": true,
+  "order": 4,
+  "updatedAt": "2026-06-13"
   }
 ]

@@ -62,6 +62,7 @@ Lobby 只負責：
 - `../../`
 
 不要直接寫死完整 GitHub Pages 網址。
+例外：掛載外部工具時，`path` 應填入完整 URL，這是唯一允許寫死絕對網址的情境。
 
 ### 5. 先做 MVP，再做擴充
 
@@ -148,6 +149,7 @@ YYYY-MM-DD
 避免混用不同日期格式，否則排序容易錯。
 
 ## 新增工具流程
+> **外部工具（獨立 repo）**：若工具已部署於其他網址，只需完成步驟 3–4，並將 `path` 填入完整 URL、`supportsIframe` 設為 `false`，不需建立本地資料夾。
 
 1. 建立工具資料夾與入口頁：
    `tools/<tool-id>/index.html`
@@ -181,6 +183,7 @@ YYYY-MM-DD
 - 新增搜尋、排序、篩選邏輯。
 - 改善 Lobby 視覺設計。
 - 新增 about、changelog、help 等靜態頁。
+- 以外部連結形式掛載獨立部署的工具。
 
 ### 不建議
 
@@ -202,7 +205,7 @@ YYYY-MM-DD
 - 不需要特殊權限或跨頁互動。
 
 不適合內嵌時，應將 `supportsIframe` 設為 `false`。
-
+外部工具（`path` 為完整 URL）因跨 origin 限制，通常無法 iframe 內嵌，應一律設為 `false`。
 ## 更新原則
 
 ### 小更新

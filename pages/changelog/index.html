@@ -6,7 +6,8 @@
   <meta name="description" content="HTML Tools Lobby 更新紀錄 — 功能新增、修正與改善記錄。" />
   <title>更新紀錄 — HTML Tools Lobby</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" />
   <link rel="stylesheet" href="../../assets/css/main.css" />
 </head>
 <body>
@@ -14,25 +15,25 @@
 <nav class="nav" role="navigation" aria-label="主導覽">
   <div class="container nav__inner">
     <a href="../../" class="nav__logo" aria-label="HTML Tools Lobby 首頁">
-      <div class="nav__logo-icon" aria-hidden="true">⚒</div>
+      <span class="nav__logo-mark">§</span>
       <span>Tools Lobby</span>
     </a>
     <ul class="nav__links" role="list">
       <li>
         <a href="../../" class="nav__link">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M6 15V9h4v6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/></svg>
           <span>大廳</span>
         </a>
       </li>
       <li>
         <a href="../about/" class="nav__link">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 7v4m0-6h.01"/></svg>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 7v4m0-6h.01"/></svg>
           <span>關於</span>
         </a>
       </li>
       <li>
         <a href="./" class="nav__link is-active" aria-current="page">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M5 6h6M5 9h4"/></svg>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M5 6h6M5 9h4"/></svg>
           <span>更新紀錄</span>
         </a>
       </li>
@@ -48,13 +49,11 @@
       <p class="page-header__sub">功能新增、工具上線、修正與改善記錄</p>
     </header>
 
-    <!-- Dynamic entries inserted by JS -->
     <div id="changelog-root">
-      <!-- Fallback static content shown before / if JS fails -->
       <div class="changelog-timeline" id="changelog-timeline">
 
         <article class="changelog-entry">
-          <time class="changelog-entry__date" datetime="2026-06-11">2026-06-11</time>
+          <time class="changelog-entry__date" datetime="2026-06-13">2026-06-13</time>
           <h2 class="changelog-entry__title">
             修復跳轉 Bug、IG Image Filler 上線
             <span class="changelog-entry__version">v1.1.0</span>
@@ -66,11 +65,11 @@
             </div>
             <div class="changelog-item">
               <span class="changelog-item__type changelog-item__type--fix">FIX</span>
-              <span>修復 GitHub Pages subpath 下 <code style="font-family:monospace;font-size:.875em">getBasePath()</code> 計算錯誤，導致 tools.json 無法載入的問題。</span>
+              <span>修復 GitHub Pages subpath 下 <code style="font-family:var(--font-mono);font-size:.875em">getBasePath()</code> 計算錯誤，導致 tools.json 無法載入的問題。</span>
             </div>
             <div class="changelog-item">
               <span class="changelog-item__type changelog-item__type--fix">FIX</span>
-              <span>移除 iframe sandbox 的 <code style="font-family:monospace;font-size:.875em">allow-same-origin</code>，消除瀏覽器安全警告。</span>
+              <span>移除 iframe sandbox 的 <code style="font-family:var(--font-mono);font-size:.875em">allow-same-origin</code>，消除瀏覽器安全警告。</span>
             </div>
           </div>
         </article>
@@ -105,7 +104,6 @@
           </div>
         </article>
 
-        <!-- Placeholder entry to demonstrate format -->
         <article class="changelog-entry">
           <time class="changelog-entry__date" datetime="2026-06-01">2026-06-01</time>
           <h2 class="changelog-entry__title">
@@ -127,8 +125,7 @@
       </div>
     </div>
 
-    <!-- Tools added from tools.json (populated by JS) -->
-    <section id="section-recent-tools" style="margin-top: 3rem;" aria-label="最近新增的工具" hidden>
+    <section id="section-recent-tools" style="margin-top:3rem;" aria-label="最近新增的工具" hidden>
       <div class="section__head">
         <h2 class="section__title">最近新增工具</h2>
         <div class="divider" aria-hidden="true"></div>
@@ -141,7 +138,7 @@
 
 <footer class="footer" role="contentinfo">
   <div class="container footer__inner">
-    <p class="footer__copy">HTML Tools Lobby — 以靜態 HTML 驅動的工具集合站</p>
+    <p class="footer__copy">© HTML Tools Lobby</p>
     <nav class="footer__links" aria-label="頁尾導覽">
       <a href="../../" class="footer__link">大廳</a>
       <a href="../about/" class="footer__link">關於</a>
@@ -152,37 +149,26 @@
 
 <script src="../../assets/js/lobby.js"></script>
 <script>
-/**
- * Changelog page extras:
- * Load tools.json and show recently-added tools (isNew === true or updatedAt within 30 days)
- */
 document.addEventListener('DOMContentLoaded', async () => {
   highlightCurrentNav();
-
   try {
     const res = await fetch('../../tools.json');
     if (!res.ok) return;
     const tools = await res.json();
-
     const now = new Date();
     const recent = tools
       .filter(t => {
         if (t.isNew) return true;
         if (!t.updatedAt) return false;
-        const diff = (now - new Date(t.updatedAt)) / (1000 * 60 * 60 * 24);
-        return diff <= 30;
+        return (now - new Date(t.updatedAt)) / (1000*60*60*24) <= 30;
       })
-      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-
+      .sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
     if (recent.length) {
-      const section = document.getElementById('section-recent-tools');
-      const grid    = document.getElementById('recent-tools-grid');
-      section.hidden = false;
-      grid.innerHTML = recent.map(t => cardHTML(t, false)).join('');
+      document.getElementById('section-recent-tools').hidden = false;
+      document.getElementById('recent-tools-grid').innerHTML =
+        recent.map(t => cardHTML(t, false)).join('');
     }
-  } catch (e) {
-    // Silent fail — changelog still useful without this section
-  }
+  } catch(e) {}
 });
 </script>
 </body>
