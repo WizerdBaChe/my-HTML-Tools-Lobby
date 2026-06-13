@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="HTML Tools Lobby 更新紀錄 — 功能新增、修正與改善記錄。" />
-  <title>更新紀錄 — HTML Tools Lobby</title>
+  <meta name="description" content="HTML Tools Lobby — 靜態 HTML 工具集合站，以卡片形式展示、搜尋、排序與預覽工具。" />
+  <title>HTML Tools Lobby</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" />
@@ -20,7 +20,7 @@
     </a>
     <ul class="nav__links" role="list">
       <li>
-        <a href="./" class="nav__link">
+        <a href="./" class="nav__link is-active" aria-current="page">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6.5 8 1l7 5.5V14a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/></svg>
           <span>大廳</span>
         </a>
@@ -32,7 +32,7 @@
         </a>
       </li>
       <li>
-        <a href="./" class="nav__link is-active" aria-current="page">
+        <a href="./pages/changelog/" class="nav__link">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M5 6h6M5 9h4"/></svg>
           <span>更新紀錄</span>
         </a>
@@ -41,96 +41,59 @@
   </div>
 </nav>
 
+<header class="hero" role="banner">
+  <div class="container">
+    <p class="hero__eyebrow">HTML Tools Lobby</p>
+    <h1 class="hero__title">整理得很舒服的<br>工具書架</h1>
+    <p class="hero__sub">靜態 HTML 小工具的集合站。找到需要的工具，直接打開用。</p>
+  </div>
+</header>
+
 <main id="main-content" role="main">
   <div class="container">
 
-    <header class="page-header">
-      <h1 class="page-header__title">更新紀錄</h1>
-      <p class="page-header__sub">功能新增、工具上線、修正與改善記錄</p>
-    </header>
-
-    <div id="changelog-root">
-      <div class="changelog-timeline" id="changelog-timeline">
-
-        <article class="changelog-entry">
-          <time class="changelog-entry__date" datetime="2026-06-13">2026-06-13</time>
-          <h2 class="changelog-entry__title">
-            修復跳轉 Bug、IG Image Filler 上線
-            <span class="changelog-entry__version">v1.1.0</span>
-          </h2>
-          <div class="changelog-items">
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--new">NEW</span>
-              <span>IG Image Filler 工具正式上線，可快速產生符合 Instagram 比例的佔位圖片。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--fix">FIX</span>
-              <span>修復 GitHub Pages subpath 下 <code style="font-family:var(--font-mono);font-size:.875em">getBasePath()</code> 計算錯誤，導致 tools.json 無化載入的問題。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--fix">FIX</span>
-              <span>移除 iframe sandbox 的 <code style="font-family:var(--font-mono);font-size:.875em">allow-same-origin</code>，消除瀏覽器安全警告。</span>
-            </div>
-          </div>
-        </article>
-
-        <article class="changelog-entry">
-          <time class="changelog-entry__date" datetime="2026-06-11">2026-06-11</time>
-          <h2 class="changelog-entry__title">
-            Lobby 正式上線
-            <span class="changelog-entry__version">v1.0.0</span>
-          </h2>
-          <div class="changelog-items">
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--new">NEW</span>
-              <span>大廳首頁 (index.html) 正式發布，支援工具卡片、精選區塊、搜尋、分類篩選與排序。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--new">NEW</span>
-              <span>新增 iframe 預覽模式，支援在大廳中快速預覽工具。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--add">ADD</span>
-              <span>建立 tools.json 資料結構，作為工具清單的單一資料來源。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--add">ADD</span>
-              <span>新增 About 與 Changelog 靜態頁面。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--add">ADD</span>
-              <span>新增自訂 404 錯誤頁。</span>
-            </div>
-          </div>
-        </article>
-
-        <article class="changelog-entry">
-          <time class="changelog-entry__date" datetime="2026-06-01">2026-06-01</time>
-          <h2 class="changelog-entry__title">
-            專案初始化
-            <span class="changelog-entry__version">v0.1.0</span>
-          </h2>
-          <div class="changelog-items">
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--add">ADD</span>
-              <span>建立 repo 基礎結構：index.html、tools.json、assets/、tools/、pages/。</span>
-            </div>
-            <div class="changelog-item">
-              <span class="changelog-item__type changelog-item__type--add">ADD</span>
-              <span>撰寫 README.md 與 MAINTENANCE.md，定義維護原則與命名規範。</span>
-            </div>
-          </div>
-        </article>
-
+    <section aria-label="搜尋與篩選">
+      <div class="toolbar" role="search">
+        <div class="search-box">
+          <svg class="search-box__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5"/><path d="m11 11 3 3"/></svg>
+          <input
+            id="search-input"
+            class="search-box__input"
+            type="search"
+            placeholder="搜尋工具名稱或標籤…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="搜尋工具"
+          />
+        </div>
+        <label for="sort-select" class="sr-only">排序方式</label>
+        <select id="sort-select" class="sort-select" aria-label="排序方式">
+          <option value="order">預設排序</option>
+          <option value="name">名稱排序</option>
+          <option value="updatedAt">最近更新</option>
+        </select>
       </div>
-    </div>
 
-    <section id="section-recent-tools" style="margin-top:3rem;" aria-label="最近新增的工具" hidden>
+      <div id="filter-group" class="filter-group" role="group" aria-label="分類篩選">
+        <button class="filter-btn is-active" data-category="all" aria-pressed="true">全部</button>
+      </div>
+    </section>
+
+    <section id="section-featured" class="section" aria-label="精選工具" hidden>
       <div class="section__head">
-        <h2 class="section__title">最近新增工具</h2>
+        <h2 class="section__title">精選</h2>
         <div class="divider" aria-hidden="true"></div>
       </div>
-      <div id="recent-tools-grid" class="tools-grid"></div>
+      <div id="featured-grid" class="featured-grid" role="list" aria-label="精選工具"></div>
+    </section>
+
+    <section id="section-all" class="section" aria-label="全部工具">
+      <div class="section__head">
+        <h2 class="section__title">全部工具</h2>
+        <span id="tool-count" class="section__count" aria-live="polite" aria-label="工具數量">0</span>
+        <div class="divider" aria-hidden="true"></div>
+      </div>
+      <div id="all-grid" class="tools-grid" role="list" aria-label="工具列表"></div>
     </section>
 
   </div>
@@ -140,36 +103,48 @@
   <div class="container footer__inner">
     <p class="footer__copy">© HTML Tools Lobby</p>
     <nav class="footer__links" aria-label="頁尾導覽">
-      <a href="./" class="footer__link">大廳</a>
-      <a href="./pages/about/" class="footer__link">關於</a>
-      <a href="./tools.json" class="footer__link" target="_blank" rel="noopener">tools.json</a>
+      <a href="./pages/about/"     class="footer__link">關於</a>
+      <a href="./pages/changelog/" class="footer__link">更新紀錄</a>
+      <a href="./tools.json"       class="footer__link" target="_blank" rel="noopener">tools.json</a>
     </nav>
   </div>
 </footer>
 
+<div
+  id="modal-overlay"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-title"
+  aria-hidden="true"
+>
+  <div id="preview-modal" class="modal">
+    <header class="modal__header">
+      <span id="modal-title" class="modal__title">工具預覽</span>
+      <button id="modal-close" class="modal__close" aria-label="關閉預覽">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m2 2 12 12M14 2 2 14"/></svg>
+      </button>
+    </header>
+    <div class="modal__iframe-wrap">
+      <iframe
+        id="modal-iframe"
+        class="modal__iframe"
+        src="about:blank"
+        title="工具預覽視窗"
+        loading="lazy"
+        sandbox="allow-scripts allow-forms"
+      ></iframe>
+    </div>
+    <footer class="modal__footer">
+      <a id="modal-open-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn--primary btn--sm">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/><path d="M13 1h2v2m0-2L8 8"/></svg>
+        在新頁開啟
+      </a>
+      <button class="btn btn--ghost btn--sm" onclick="document.getElementById('modal-close').click()">關閉</button>
+    </footer>
+  </div>
+</div>
+
 <script src="./assets/js/lobby.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', async () => {
-  highlightCurrentNav();
-  try {
-    const res = await fetch('./tools.json');
-    if (!res.ok) return;
-    const tools = await res.json();
-    const now = new Date();
-    const recent = tools
-      .filter(t => {
-        if (t.isNew) return true;
-        if (!t.updatedAt) return false;
-        return (now - new Date(t.updatedAt)) / (1000*60*60*24) <= 30;
-      })
-      .sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
-    if (recent.length) {
-      document.getElementById('section-recent-tools').hidden = false;
-      document.getElementById('recent-tools-grid').innerHTML =
-        recent.map(t => cardHTML(t, false)).join('');
-    }
-  } catch(e) {}
-});
-</script>
 </body>
 </html>
