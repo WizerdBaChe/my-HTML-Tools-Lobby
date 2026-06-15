@@ -1,0 +1,3 @@
+# 如果你想針對特定檔案類型（如圖片）保留緩存，但強制更新 HTML
+/*.html
+  Cache-Control: no-cache

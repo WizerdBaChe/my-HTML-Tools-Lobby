@@ -54,7 +54,7 @@
 		"tags": ["color", "image", "placeholder"],
 		"supportsIframe": true,
 		"status": "ready",
-		"featured": true,
+		"featured": false,
 		"isNew": false,
 		"order": 4,
 		"updatedAt": "2026-06-11"
@@ -69,7 +69,7 @@
 		"tags": ["html","web","file-processer"],
 		"supportsIframe": true,
 		"status": "ready",
-		"featured": true,
+		"featured": false,
 		"isNew": false,
 		"order": 5,
 		"updatedAt": "2026-06-11"
