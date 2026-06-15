@@ -440,7 +440,14 @@
     const editorPane    = document.getElementById('editor-pane');
 
     let currentBlobUrl = null;
-
+	// ── TinyURL 短網址 ──
+	async function shortenURL(longUrl) {
+	  const api = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`;
+	  const res  = await fetch(api);
+	  if (!res.ok) throw new Error('TinyURL failed');
+	  return await res.text();
+	}
+	
     // ── fix 1: 清除後可再次上傳 ──
     // 每次 change 後立刻重置 value，讓同一個檔案也能再次觸發
     fileInput.addEventListener('change', (e) => {
@@ -494,16 +501,26 @@
     };
 
     // ── 分享連結 ──
-    document.getElementById('btn-share').onclick = () => {
-      const html = editorEl.value.trim();
-      if (!html) { showToast('請先輸入 HTML 內容'); return; }
-      const compressed = LZString.compressToEncodedURIComponent(html);
-      const url = `${location.origin}${location.pathname}#${compressed}`;
-      shareLinkText.textContent = url;
-      shareLinkText.dataset.full = url;
-      shareBar.classList.add('visible');
-      showToast('分享連結已產生');
-    };
+	document.getElementById('btn-share').onclick = async () => {
+	  const html = editorEl.value.trim();
+	  if (!html) { showToast('請先輸入 HTML 內容'); return; }
+
+	  const compressed = LZString.compressToEncodedURIComponent(html);
+	  const longUrl    = `${location.origin}${location.pathname}#${compressed}`;
+
+	  showToast('產生中...');
+	  try {
+		const shortUrl = await shortenURL(longUrl);
+		shareLinkText.textContent = shortUrl;
+		shareLinkText.dataset.full = shortUrl;
+	  } catch {
+		shareLinkText.textContent = longUrl;
+		shareLinkText.dataset.full = longUrl;
+		showToast('短網址服務無回應，已使用原始連結');
+	  }
+	  shareBar.classList.add('visible');
+	  showToast('分享連結已產生');
+	};
 
     function copyShare() {
       const url = shareLinkText.dataset.full || shareLinkText.textContent;
