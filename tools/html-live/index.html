@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Previewer — HTML 預覽器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #1A1A1A;
+      --bg:         #F5F4F0;
+      --bg-editor:  #0F0F0F;
+      --bg-preview-header: #ECEAE4;   /* fix 4: 比外層暗一階，製造層次 */
+      --border:     #D8D5CE;          /* fix 3: 稍深，線條更可見 */
+      --indigo:     #4F46E5;
+      --indigo-dim: #3730A3;
+      --green:      #22C55E;
+      --slate:      #6B7280;
+      --white:      #FFFFFF;
+      --radius:     8px;              /* fix 5: 統一圓角單位 */
+      --font-display: 'Syne', sans-serif;
+      --font-body:    'Inter', sans-serif;
+      --font-code:    'JetBrains Mono', monospace;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 50px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    #logo {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #logo-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--indigo);
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Buttons (fix 5: 統一用 --radius) ── */
+    .btn {
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 13px;
+      border-radius: var(--radius);
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      line-height: 1;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-primary { background: var(--indigo); color: var(--white); border-color: var(--indigo); }
+    .btn-primary:hover { background: var(--indigo-dim); border-color: var(--indigo-dim); }
+
+    .btn-ghost { background: transparent; color: var(--slate); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--white); color: var(--ink); }
+
+    .btn-share { background: transparent; color: var(--green); border-color: #BBF7D0; }
+    .btn-share:hover { background: #F0FDF4; }
+
+    .btn-danger { background: transparent; color: #DC2626; border-color: #FECACA; }
+    .btn-danger:hover { background: #FFF5F5; }
+
+    /* ── Upload label (fix 5: 圓角一致) ── */
+    #file-label {
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate);
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 5px 12px;
+      cursor: pointer;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    #file-label:hover { border-color: var(--indigo); color: var(--indigo); background: #F0F0FF; }
+    #file-input { display: none; }
+
+    /* ── Share bar (fix 5: 圓角化 copy btn) ── */
+    #share-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      background: #F0FDF4;
+      border-bottom: 1px solid #BBF7D0;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    #share-bar.visible { display: flex; }
+    #share-bar-label { font-weight: 600; color: #15803D; white-space: nowrap; }
+    #share-link-text {
+      font-family: var(--font-code);
+      font-size: 11px;
+      color: #166534;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #copy-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: var(--radius);
+      border: 1px solid #86EFAC;
+      background: var(--white);
+      color: #15803D;
+      cursor: pointer;
+      transition: background 0.1s;
+      white-space: nowrap;
+    }
+    #copy-btn:hover { background: #DCFCE7; }
+
+    /* ── Workspace ── */
+    #workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Editor pane (fix 3 & 5) ── */
+    #editor-pane {
+      width: 45%;
+      min-width: 240px;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-editor);
+      flex-shrink: 0;
+    }
+
+    #editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      border-bottom: 1px solid #2A2A2A;
+      flex-shrink: 0;
+    }
+
+    /* fix 3: 標題用更亮的顏色 */
+    #editor-label {
+      font-family: var(--font-code);
+      font-size: 11px;
+      color: #A0A8B4;          /* 原本 #4B5563，現在明顯亮很多 */
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    #char-count {
+      font-family: var(--font-code);
+      font-size: 10px;
+      color: #525C6A;          /* fix 3: 也稍微提亮 */
+    }
+
+    /* fix 3: placeholder 加亮 */
+    #editor {
+      flex: 1;
+      background: var(--bg-editor);
+      color: #E5E7EB;
+      font-family: var(--font-code);
+      font-size: 13px;
+      line-height: 1.65;
+      padding: 16px;
+      border: none;
+      outline: none;
+      resize: none;
+      tab-size: 2;
+    }
+    #editor::placeholder { color: #5A6370; }  /* 原本 #374151，現在可見 */
+
+    /* ── Signature Divider ── */
+    #divider {
+      width: 5px;
+      background: #2A2A3A;
+      flex-shrink: 0;
+      position: relative;
+      cursor: col-resize;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    #divider:hover, #divider.dragging { background: var(--indigo); }
+
+    #live-pill {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--indigo);
+      color: var(--white);
+      font-family: var(--font-code);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      padding: 5px 6px;
+      border-radius: 4px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      user-select: none;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #divider:hover #live-pill,
+    #divider.dragging #live-pill { opacity: 1; }
+
+    #live-pill.pulsing { animation: pulse-pill 1.2s ease-in-out infinite; opacity: 1; }
+
+    @keyframes pulse-pill {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Preview pane (fix 4 & 5) ── */
+    #preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--white);
+      overflow: hidden;
+    }
+
+    /* fix 4: 用比外層深一階的暖灰，製造層次感 */
+    #preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-preview-header);
+      flex-shrink: 0;
+    }
+
+    #preview-label {
+      font-family: var(--font-code);
+      font-size: 11px;
+      color: #4A5568;          /* fix 4: 比 --slate 深，在暖灰上清晰 */
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    #preview-url {
+      font-family: var(--font-code);
+      font-size: 10px;
+      color: #8A8F9A;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #preview {
+      flex: 1;
+      border: none;
+      background: var(--white);
+      width: 100%;
+    }
+
+    /* ── Empty state ── */
+    #empty-state {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #empty-icon { font-size: 26px; opacity: 0.18; }
+
+    #empty-text {
+      font-size: 12px;
+      color: #B0B5BF;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--ink);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 18px;
+      border-radius: var(--radius);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      #editor-pane { width: 100%; min-width: unset; }
+      #workspace   { flex-direction: column; }
+      #divider     { width: 100%; height: 5px; cursor: row-resize; }
+      #live-pill   { writing-mode: horizontal-tb; }
+      #preview-pane { min-height: 45vh; }
+    }
+
+    :focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      #live-pill.pulsing { animation: none; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div id="logo">
+      <div id="logo-dot"></div>
+      Previewer
+    </div>
+    <div id="toolbar">
+      <label id="file-label" tabindex="0" role="button">
+        ↑ 上傳 .html
+        <input type="file" id="file-input" accept=".html" />
+      </label>
+      <button class="btn btn-primary" id="btn-preview">▶ 預覽</button>
+      <button class="btn btn-share"   id="btn-share">⬡ 產生分享連結</button>
+      <button class="btn btn-danger"  id="btn-clear">✕ 清除</button>
+    </div>
+  </header>
+
+  <div id="share-bar">
+    <span id="share-bar-label">分享連結</span>
+    <span id="share-link-text"></span>
+    <button id="copy-btn" onclick="copyShare()">複製</button>
+    <button onclick="closeShare()"
+      style="background:none;border:none;cursor:pointer;color:#6B7280;font-size:16px;line-height:1;padding:0 2px;">✕</button>
+  </div>
+
+  <div id="workspace">
+
+    <div id="editor-pane">
+      <div id="editor-header">
+        <span id="editor-label">HTML 輸入</span>
+        <span id="char-count">0 字元</span>
+      </div>
+      <textarea id="editor" spellcheck="false"
+        placeholder="在此貼上 HTML 程式碼...&#10;&#10;支援完整文件或片段。"></textarea>
+    </div>
+
+    <div id="divider">
+      <div id="live-pill">LIVE</div>
+    </div>
+
+    <div id="preview-pane">
+      <div id="preview-header">
+        <span id="preview-label">預覽</span>
+        <span id="preview-url">—</span>
+      </div>
+      <div id="empty-state">
+        <div id="empty-icon">◻</div>
+        <div id="empty-text">貼上 HTML 後點「▶ 預覽」<br>或上傳 .html 檔</div>
+      </div>
+      <iframe id="preview"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+        style="display:none;"></iframe>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const editorEl      = document.getElementById('editor');
+    const previewEl     = document.getElementById('preview');
+    const fileInput     = document.getElementById('file-input');
+    const charCount     = document.getElementById('char-count');
+    const previewUrl    = document.getElementById('preview-url');
+    const emptyState    = document.getElementById('empty-state');
+    const livePill      = document.getElementById('live-pill');
+    const shareBar      = document.getElementById('share-bar');
+    const shareLinkText = document.getElementById('share-link-text');
+    const divider       = document.getElementById('divider');
+    const workspace     = document.getElementById('workspace');
+    const editorPane    = document.getElementById('editor-pane');
+
+    let currentBlobUrl = null;
+
+    // ── fix 1: 清除後可再次上傳 ──
+    // 每次 change 後立刻重置 value，讓同一個檔案也能再次觸發
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        editorEl.value = ev.target.result;
+        charCount.textContent = `${editorEl.value.length.toLocaleString()} 字元`;
+        renderHTML(ev.target.result);
+        showToast(`已載入 ${file.name}`);
+      };
+      reader.readAsText(file);
+      // 重置讓相同檔名可再次觸發 change event
+      fileInput.value = '';
+    });
+
+    document.getElementById('file-label').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // ── 字元計數 ──
+    editorEl.addEventListener('input', () => {
+      charCount.textContent = `${editorEl.value.length.toLocaleString()} 字元`;
+    });
+
+    // ── 核心渲染 ──
+    function renderHTML(html) {
+      if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+      livePill.classList.add('pulsing');
+
+      const blob = new Blob([html], { type: 'text/html' });
+      currentBlobUrl = URL.createObjectURL(blob);
+
+      previewEl.style.display = 'block';
+      emptyState.style.display = 'none';
+      previewEl.src = currentBlobUrl;
+      previewUrl.textContent = 'blob:// 本地沙箱';
+
+      previewEl.onload = () => livePill.classList.remove('pulsing');
+    }
+
+    // ── 預覽按鈕 ──
+    document.getElementById('btn-preview').onclick = () => {
+      const html = editorEl.value.trim();
+      if (!html) { showToast('請先輸入 HTML 內容'); return; }
+      renderHTML(html);
+    };
+
+    // ── 分享連結 ──
+    document.getElementById('btn-share').onclick = () => {
+      const html = editorEl.value.trim();
+      if (!html) { showToast('請先輸入 HTML 內容'); return; }
+      const compressed = LZString.compressToEncodedURIComponent(html);
+      const url = `${location.origin}${location.pathname}#${compressed}`;
+      shareLinkText.textContent = url;
+      shareLinkText.dataset.full = url;
+      shareBar.classList.add('visible');
+      showToast('分享連結已產生');
+    };
+
+    function copyShare() {
+      const url = shareLinkText.dataset.full || shareLinkText.textContent;
+      navigator.clipboard.writeText(url).then(() => showToast('已複製到剪貼簿'));
+    }
+
+    function closeShare() { shareBar.classList.remove('visible'); }
+
+    // ── fix 1: 清除也要重置 fileInput.value ──
+    document.getElementById('btn-clear').onclick = () => {
+      editorEl.value = '';
+      charCount.textContent = '0 字元';
+      previewEl.src = 'about:blank';
+      previewEl.style.display = 'none';
+      emptyState.style.display = 'flex';
+      previewUrl.textContent = '—';
+      livePill.classList.remove('pulsing');
+      shareBar.classList.remove('visible');
+      history.replaceState(null, '', location.pathname);
+      fileInput.value = '';          // ← 關鍵：重置讓下次上傳可觸發
+      if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+      showToast('已清除');
+    };
+
+    // ── hash 自動還原 ──
+    window.addEventListener('load', () => {
+      const hash = location.hash.slice(1);
+      if (!hash) return;
+      const html = LZString.decompressFromEncodedURIComponent(hash);
+      if (html) {
+        editorEl.value = html;
+        charCount.textContent = `${html.length.toLocaleString()} 字元`;
+        renderHTML(html);
+        showToast('已從分享連結還原');
+      }
+    });
+
+    // ── fix 2: 拖動分隔條 resize ──
+    let isDragging = false;
+
+    divider.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      divider.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      // 阻止 iframe 攔截 mousemove
+      previewEl.style.pointerEvents = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const workspaceRect = workspace.getBoundingClientRect();
+      const newWidth = e.clientX - workspaceRect.left;
+      const minW = 180;
+      const maxW = workspaceRect.width - 180 - divider.offsetWidth;
+      editorPane.style.width = Math.min(Math.max(newWidth, minW), maxW) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      divider.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      previewEl.style.pointerEvents = '';
+    });
+
+    // ── Toast ──
+    let toastTimer;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+  </script>
+</body>
+</html>
