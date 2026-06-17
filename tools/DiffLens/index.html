@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="default">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DiffLens — 檔案差異比對工具</title>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  THEME PLUGIN ARCHITECTURE                                           ║
+  ║  To create a custom theme, set data-theme="mytheme" on <html>       ║
+  ║  and define a [data-theme="mytheme"] block that overrides the vars  ║
+  ║  listed in :root below. No JS required. Zero framework dependency.  ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   THEME TOKEN LAYER — the only thing a theme needs to override
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  /* Surface */
+  --bg-page:       #F5F4F0;
+  --bg-surface:    #FFFFFF;
+  --bg-panel:      #F0EFE9;
+  --bg-overlay:    rgba(245,244,240,0.88);
+
+  /* Text */
+  --text-primary:  #1A1A1A;
+  --text-muted:    #6B7280;
+  --text-faint:    #9CA3AF;
+
+  /* Brand */
+  --accent:        #4F46E5;
+  --accent-hover:  #4338CA;
+  --accent-text:   #FFFFFF;
+  --accent-subtle: rgba(79,70,229,0.08);
+  --accent-border: rgba(79,70,229,0.18);
+
+  /* Borders */
+  --border:        rgba(26,26,26,0.10);
+  --border-inner:  rgba(26,26,26,0.06);
+
+  /* Diff colours */
+  --diff-add-bg:    #DCFCE7;
+  --diff-add-line:  #BBF7D0;
+  --diff-add-num:   #16A34A;
+  --diff-add-text:  #14532D;
+  --diff-del-bg:    #FEE2E2;
+  --diff-del-line:  #FECACA;
+  --diff-del-num:   #DC2626;
+  --diff-del-text:  #7F1D1D;
+  --diff-ctx-bg:    #FFFFFF;
+  --diff-ctx-num:   #9CA3AF;
+
+  /* Status */
+  --success:       #16A34A;
+  --error:         #DC2626;
+  --warning:       #D97706;
+
+  /* Typography */
+  --font-ui:       'Inter', system-ui, sans-serif;
+  --font-display:  'Syne', 'Inter', sans-serif;
+  --font-code:     'JetBrains Mono', ui-monospace, monospace;
+
+  /* Motion */
+  --ease:          cubic-bezier(0.16,1,0.3,1);
+  --dur-fast:      120ms;
+  --dur-normal:    220ms;
+}
+
+/* ── BUILT-IN THEME: dark ── */
+[data-theme="dark"] {
+  --bg-page:       #0F1117;
+  --bg-surface:    #1A1D27;
+  --bg-panel:      #13151E;
+  --bg-overlay:    rgba(15,17,23,0.90);
+  --text-primary:  #E5E7EB;
+  --text-muted:    #9CA3AF;
+  --text-faint:    #4B5563;
+  --accent:        #818CF8;
+  --accent-hover:  #A5B4FC;
+  --accent-text:   #0F1117;
+  --accent-subtle: rgba(129,140,248,0.10);
+  --accent-border: rgba(129,140,248,0.22);
+  --border:        rgba(255,255,255,0.08);
+  --border-inner:  rgba(255,255,255,0.04);
+  --diff-add-bg:   rgba(22,163,74,0.12);
+  --diff-add-line: rgba(22,163,74,0.22);
+  --diff-add-num:  #4ADE80;
+  --diff-add-text: #DCFCE7;
+  --diff-del-bg:   rgba(220,38,38,0.12);
+  --diff-del-line: rgba(220,38,38,0.22);
+  --diff-del-num:  #F87171;
+  --diff-del-text: #FEE2E2;
+  --diff-ctx-bg:   #1A1D27;
+  --diff-ctx-num:  #4B5563;
+}
+
+/* ── BUILT-IN THEME: high-contrast (accessibility) ── */
+[data-theme="hc"] {
+  --bg-page:       #000000;
+  --bg-surface:    #111111;
+  --bg-panel:      #0A0A0A;
+  --text-primary:  #FFFFFF;
+  --text-muted:    #CCCCCC;
+  --text-faint:    #999999;
+  --accent:        #FFFF00;
+  --accent-hover:  #FFFFAA;
+  --accent-text:   #000000;
+  --border:        #555555;
+  --diff-add-bg:   #004400;
+  --diff-add-text: #00FF00;
+  --diff-del-bg:   #440000;
+  --diff-del-text: #FF6666;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE RESET & LAYOUT
+   ═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════ */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-logo {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.header-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  letter-spacing: 0.03em;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   THEME SWITCHER
+   ═══════════════════════════════════════════════════════════ */
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.theme-btn {
+  width: 28px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background var(--dur-fast) var(--ease);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.theme-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.theme-btn.active { background: var(--accent); color: var(--accent-text); }
+
+/* ═══════════════════════════════════════════════════════════
+   HERO / EMPTY STATE
+   ═══════════════════════════════════════════════════════════ */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: calc(100vh - 48px);
+}
+
+.hero-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+}
+
+.hero-inner { width: 100%; max-width: 480px; }
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 28px;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.hero-title span { color: var(--accent); }
+
+.hero-desc {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  max-width: 420px;
+  margin-bottom: 36px;
+}
+
+.hero-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 36px;
+}
+
+.format-tag {
+  font-family: var(--font-code);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.hero-cta { display: flex; flex-direction: column; gap: 16px; }
+
+.drop-zone {
+  position: relative;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--dur-normal) var(--ease);
+  background: var(--bg-surface);
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.drop-zone.drag-over { transform: scale(1.01); }
+
+.drop-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.drop-text-primary {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.drop-text-secondary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.hero-or {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+  position: relative;
+}
+
+.hero-or::before,
+.hero-or::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border);
+}
+
+.hero-or::before { left: 0; }
+.hero-or::after { right: 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   HERO RIGHT — demo terminal
+   ═══════════════════════════════════════════════════════════ */
+.hero-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+
+.hero-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--text-primary) 1px, transparent 1px),
+    linear-gradient(90deg, var(--text-primary) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.04;
+}
+
+.demo-window {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: calc(100% - 80px);
+  max-width: 440px;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.08);
+}
+
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-inner);
+  gap: 6px;
+}
+
+.dot { width: 11px; height: 11px; border-radius: 50%; }
+.dot-r { background: #FF5F57; }
+.dot-y { background: #FEBC2E; }
+.dot-g { background: #28C840; }
+
+.demo-filename {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-left: 8px;
+}
+
+.demo-content {
+  padding: 16px;
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.demo-row {
+  display: flex;
+  gap: 12px;
+}
+
+.demo-ln { color: var(--text-faint); min-width: 20px; user-select: none; }
+
+.demo-added   { background: var(--diff-add-bg); color: var(--diff-add-text); border-radius: 3px; padding: 0 4px; }
+.demo-removed { background: var(--diff-del-bg); color: var(--diff-del-text); border-radius: 3px; padding: 0 4px; text-decoration: line-through; }
+.demo-ctx     { color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN WORKSPACE (when files are loaded)
+   ═══════════════════════════════════════════════════════════ */
+.workspace { display: none; flex-direction: column; flex: 1; }
+.workspace.active { display: flex; }
+
+/* toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: var(--font-code);
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.file-chip .ext-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.file-chip .chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-arrow {
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+/* segments */
+.seg-group {
+  display: flex;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.seg-btn {
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.seg-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.seg-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* btn variants */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+  white-space: nowrap;
+}
+
+.btn:hover { background: var(--bg-panel); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover { color: var(--error); background: rgba(220,38,38,0.06); }
+
+/* ═══════════════════════════════════════════════════════════
+   UPLOAD PANEL (inside workspace, top)
+   ═══════════════════════════════════════════════════════════ */
+.upload-panel {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.upload-slot {
+  padding: 16px 20px;
+}
+
+.upload-slot + .upload-slot {
+  border-left: 1px solid var(--border);
+}
+
+.upload-slot-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.upload-slot-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-mini-zone {
+  flex: 1;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+}
+
+.upload-mini-zone:hover, .upload-mini-zone.drag-over {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.upload-mini-zone.loaded {
+  border-style: solid;
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(22,163,74,0.05);
+}
+
+.panel-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--text-faint);
+  font-size: 16px;
+}
+
+.compare-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  background: var(--bg-page);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DIFF VIEW
+   ═══════════════════════════════════════════════════════════ */
+.diff-viewport {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-page);
+}
+
+/* stats ribbon */
+.stats-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stat-dot.add { background: var(--diff-add-num); }
+.stat-dot.del { background: var(--diff-del-num); }
+
+.stat-n { font-weight: 600; }
+.stat-n.add { color: var(--diff-add-num); }
+.stat-n.del { color: var(--diff-del-num); }
+
+.stat-label { color: var(--text-muted); }
+
+.stat-spacer { flex: 1; }
+
+/* diff table */
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+/* unified view */
+.diff-table.unified .diff-row-add    { background: var(--diff-add-bg); }
+.diff-table.unified .diff-row-del    { background: var(--diff-del-bg); }
+.diff-table.unified .diff-row-ctx    { background: var(--diff-ctx-bg); }
+.diff-table.unified .diff-row-hunk   { background: var(--bg-panel); }
+
+.diff-gutter {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  padding: 0 10px 0 4px;
+  user-select: none;
+  color: var(--diff-ctx-num);
+  vertical-align: top;
+  font-size: 11px;
+}
+
+.diff-gutter.add { color: var(--diff-add-num); border-right: 2px solid var(--diff-add-num); }
+.diff-gutter.del { color: var(--diff-del-num); border-right: 2px solid var(--diff-del-num); }
+
+.diff-sign {
+  width: 18px;
+  text-align: center;
+  font-weight: 600;
+  padding: 0;
+  vertical-align: top;
+}
+
+.diff-sign.add { color: var(--diff-add-num); }
+.diff-sign.del { color: var(--diff-del-num); }
+
+.diff-code {
+  padding: 1px 16px 1px 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  vertical-align: top;
+}
+
+.diff-code.add { color: var(--diff-add-text); }
+.diff-code.del { color: var(--diff-del-text); text-decoration: line-through; opacity: 0.85; }
+
+/* inline word highlights */
+.word-add {
+  background: var(--diff-add-line);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.word-del {
+  background: var(--diff-del-line);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* hunk separator */
+.diff-hunk-td {
+  padding: 4px 16px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-inner);
+  border-bottom: 1px solid var(--border-inner);
+}
+
+/* split view */
+.diff-split-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100%;
+}
+
+.diff-split-pane {
+  border-right: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.diff-split-pane:last-child { border-right: none; }
+
+.split-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  z-index: 5;
+}
+
+/* no diff message */
+.no-diff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.no-diff-icon { font-size: 36px; }
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════ */
+.toast-container {
+  position: fixed;
+  top: 58px;
+  right: 16px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  transform: translateX(110%);
+  transition: transform var(--dur-normal) var(--ease);
+  pointer-events: auto;
+  max-width: 320px;
+}
+
+.toast.visible { transform: translateX(0); }
+.toast.success { border-color: rgba(22,163,74,0.3); color: var(--success); }
+.toast.error   { border-color: rgba(220,38,38,0.3); color: var(--error); }
+.toast.info    { border-color: var(--accent-border); color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════════
+   LOADING STATE
+   ═══════════════════════════════════════════════════════════ */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.2);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-overlay.active { display: flex; }
+
+.loading-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 36px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-visual { display: none; }
+  .hero-title { font-size: 32px; }
+  .upload-panel { grid-template-columns: 1fr; }
+  .panel-divider { padding: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .diff-split-wrapper { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INPUT MODE TABS  (hero-level tab strip)
+   ═══════════════════════════════════════════════════════════ */
+.input-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.input-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all var(--dur-normal) var(--ease);
+  white-space: nowrap;
+}
+
+.input-tab:hover { color: var(--text-primary); background: var(--bg-surface); }
+
+.input-tab.active {
+  background: var(--bg-surface);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.input-tab .tab-icon { font-size: 15px; line-height: 1; }
+
+/* panels that switch */
+.input-panel { display: none; }
+.input-panel.active { display: block; }
+
+/* ── paste panel layout ── */
+.paste-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.paste-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.paste-clear-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-ui);
+  transition: color var(--dur-fast);
+}
+
+.paste-clear-btn:hover { color: var(--error); }
+
+.paste-textarea {
+  width: 100%;
+  min-height: 180px;
+  max-height: 300px;
+  padding: 12px 14px;
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease);
+  caret-color: var(--accent);
+}
+
+.paste-textarea::placeholder {
+  color: var(--text-faint);
+  font-family: var(--font-code);
+}
+
+.paste-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.paste-textarea.has-content {
+  border-color: var(--success);
+}
+
+/* char counter badge */
+.paste-meta {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  text-align: right;
+  font-family: var(--font-code);
+}
+
+/* workspace toolbar paste-mode indicator */
+.paste-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+
+.paste-chip .ext-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+.hidden { display: none !important; }
+input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-brand">
+    <span class="header-logo">DiffLens</span>
+    <span class="header-badge">Web</span>
+  </div>
+  <div class="header-actions">
+    <!-- theme switcher -->
+    <div class="theme-switcher" role="group" aria-label="選擇主題">
+      <button class="theme-btn active" data-theme-target="default" title="預設主題（亮色）">☀</button>
+      <button class="theme-btn" data-theme-target="dark" title="暗色主題">◑</button>
+      <button class="theme-btn" data-theme-target="hc" title="高對比（無障礙）">◉</button>
+    </div>
+    <button class="btn" id="headerNewCompare" style="display:none">+ 新比對</button>
+  </div>
+</header>
+
+<!-- HERO (empty state) -->
+<main id="heroSection">
+  <div class="hero">
+    <!-- left: copy -->
+    <div class="hero-copy">
+      <div class="hero-inner">
+        <div class="hero-eyebrow">Code Diff Tool</div>
+        <h1 class="hero-title">
+          即時比對<br>
+          <span>任何文字格式</span>
+        </h1>
+        <p class="hero-desc">
+          上傳兩個檔案，在瀏覽器直接得到 GitHub 風格的逐行差異視圖。
+          支援程式碼、文件、設定檔等各種文字格式，不需安裝任何工具。
+        </p>
+
+        <div class="hero-formats" aria-label="支援格式">
+          <span class="format-tag">.py</span>
+          <span class="format-tag">.js</span>
+          <span class="format-tag">.ts</span>
+          <span class="format-tag">.md</span>
+          <span class="format-tag">.json</span>
+          <span class="format-tag">.yaml</span>
+          <span class="format-tag">.toml</span>
+          <span class="format-tag">.c</span>
+          <span class="format-tag">.cpp</span>
+          <span class="format-tag">.java</span>
+          <span class="format-tag">.go</span>
+          <span class="format-tag">.rs</span>
+          <span class="format-tag">.rb</span>
+          <span class="format-tag">.php</span>
+          <span class="format-tag">.sh</span>
+          <span class="format-tag">.sql</span>
+          <span class="format-tag">.css</span>
+          <span class="format-tag">.html</span>
+          <span class="format-tag">.xml</span>
+          <span class="format-tag">.txt</span>
+          <span class="format-tag">.csv</span>
+          <span class="format-tag">… 任何文字檔</span>
+        </div>
+
+        <div class="hero-cta">
+
+          <!-- ── Input mode tab strip ── -->
+          <div class="input-tabs" role="tablist" aria-label="選擇輸入方式">
+            <button class="input-tab active" id="tabFile" role="tab" aria-selected="true" aria-controls="panelFile">
+              <span class="tab-icon">📁</span> 上傳檔案
+            </button>
+            <button class="input-tab" id="tabPaste" role="tab" aria-selected="false" aria-controls="panelPaste">
+              <span class="tab-icon">✏️</span> 貼上文字
+            </button>
+          </div>
+
+          <!-- ── Panel: Upload ── -->
+          <div class="input-panel active" id="panelFile" role="tabpanel" aria-labelledby="tabFile">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+              <div>
+                <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">版本 A（舊）</div>
+                <div class="drop-zone" id="heroDropA" role="button" tabindex="0" aria-label="上傳版本 A 檔案">
+                  <div class="drop-icon">📄</div>
+                  <div class="drop-text-primary" id="heroDropALabel">點擊或拖放檔案</div>
+                  <div class="drop-text-secondary">任何文字格式</div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">版本 B（新）</div>
+                <div class="drop-zone" id="heroDropB" role="button" tabindex="0" aria-label="上傳版本 B 檔案">
+                  <div class="drop-icon">📄</div>
+                  <div class="drop-text-primary" id="heroDropBLabel">點擊或拖放檔案</div>
+                  <div class="drop-text-secondary">任何文字格式</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="heroCompareBtn" disabled style="width:100%;justify-content:center;padding:11px;">
+              比對差異
+            </button>
+          </div>
+
+          <!-- ── Panel: Paste ── -->
+          <div class="input-panel" id="panelPaste" role="tabpanel" aria-labelledby="tabPaste">
+            <div class="paste-grid">
+              <div>
+                <div class="paste-col-label">
+                  <span>版本 A（舊）</span>
+                  <button class="paste-clear-btn" id="pasteClearA" title="清除版本 A">清除</button>
+                </div>
+                <textarea
+                  class="paste-textarea"
+                  id="pasteA"
+                  placeholder="貼上或輸入舊版本內容…
+例如：git show HEAD~1:app.py"
+                  aria-label="版本 A 文字輸入"
+                  spellcheck="false"
+                  autocomplete="off"
+                ></textarea>
+                <div class="paste-meta" id="pasteAMeta">0 行 · 0 字元</div>
+              </div>
+              <div>
+                <div class="paste-col-label">
+                  <span>版本 B（新）</span>
+                  <button class="paste-clear-btn" id="pasteClearB" title="清除版本 B">清除</button>
+                </div>
+                <textarea
+                  class="paste-textarea"
+                  id="pasteB"
+                  placeholder="貼上或輸入新版本內容…
+例如：當前檔案內容"
+                  aria-label="版本 B 文字輸入"
+                  spellcheck="false"
+                  autocomplete="off"
+                ></textarea>
+                <div class="paste-meta" id="pasteBMeta">0 行 · 0 字元</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="pasteCompareBtn" disabled style="width:100%;justify-content:center;padding:11px;">
+              比對差異
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- right: demo visual -->
+    <div class="hero-visual">
+      <div class="hero-grid-bg" aria-hidden="true"></div>
+      <div class="demo-window" role="img" aria-label="diff 輸出範例預覽">
+        <div class="demo-titlebar">
+          <span class="dot dot-r"></span>
+          <span class="dot dot-y"></span>
+          <span class="dot dot-g"></span>
+          <span class="demo-filename">app.py — diff view</span>
+        </div>
+        <div class="demo-content" id="demoContent" aria-hidden="true"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- WORKSPACE (after files loaded) -->
+<section class="workspace" id="workspace">
+
+  <!-- File toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <!-- file-mode chips (shown when inputMode=file) -->
+      <div id="toolbarFileInfo" style="display:flex;align-items:center;gap:8px;">
+        <div class="file-chip" id="chipA" title="">
+          <span class="ext-badge" id="chipAExt">?</span>
+          <span class="chip-name" id="chipAName">—</span>
+        </div>
+        <span class="chip-arrow">→</span>
+        <div class="file-chip" id="chipB" title="">
+          <span class="ext-badge" id="chipBExt">?</span>
+          <span class="chip-name" id="chipBName">—</span>
+        </div>
+        <button class="btn" id="reuploadA" title="換版本 A 檔案">↺ 換版本 A</button>
+        <button class="btn" id="reuploadB" title="換版本 B 檔案">↺ 換版本 B</button>
+      </div>
+      <!-- paste-mode chips (shown when inputMode=paste) -->
+      <div id="toolbarPasteInfo" style="display:none;align-items:center;gap:8px;">
+        <div class="paste-chip">
+          <span class="ext-badge">txt</span>
+          <span>版本 A（貼上）</span>
+        </div>
+        <span class="chip-arrow">→</span>
+        <div class="paste-chip">
+          <span class="ext-badge">txt</span>
+          <span>版本 B（貼上）</span>
+        </div>
+        <button class="btn" id="editPasteBtn">✏️ 編輯內容</button>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <!-- diff mode -->
+      <div class="seg-group" role="group" aria-label="比對模式">
+        <button class="seg-btn active" data-mode="unified">Unified</button>
+        <button class="seg-btn" data-mode="split">Split</button>
+      </div>
+
+      <!-- granularity -->
+      <div class="seg-group" role="group" aria-label="比對粒度">
+        <button class="seg-btn active" data-gran="lines">逐行</button>
+        <button class="seg-btn" data-gran="words">逐字</button>
+        <button class="seg-btn" data-gran="chars">逐字元</button>
+      </div>
+
+      <button class="btn" id="copyBtn">📋 複製</button>
+      <button class="btn btn-ghost" id="clearBtn" title="清除並重新開始">✕</button>
+    </div>
+  </div>
+
+  <!-- Stats ribbon -->
+  <div class="stats-ribbon" id="statsRibbon">
+    <div class="stat-chip">
+      <span class="stat-dot add"></span>
+      <span class="stat-n add" id="statAdded">0</span>
+      <span class="stat-label">行新增</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-dot del"></span>
+      <span class="stat-n del" id="statRemoved">0</span>
+      <span class="stat-label">行刪除</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-n" id="statChanges" style="color:var(--text-muted)">0</span>
+      <span class="stat-label">總變更</span>
+    </div>
+    <span class="stat-spacer"></span>
+    <span style="font-size:11px;color:var(--text-faint)" id="statsFilename"></span>
+  </div>
+
+  <!-- Diff output -->
+  <div class="diff-viewport" id="diffViewport"></div>
+
+</section>
+
+<!-- Hidden file inputs -->
+<input type="file" id="inputA">
+<input type="file" id="inputB">
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay" role="status" aria-label="比對中">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div style="font-size:14px;font-weight:500;color:var(--text-muted)">分析差異中…</div>
+  </div>
+</div>
+
+<!-- diff.js -->
+<script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   DIFFLENS CORE
+   ═══════════════════════════════════════════════════════════ */
+'use strict';
+
+// ── State ────────────────────────────────────────────────────
+const state = {
+  fileA: null, fileB: null,           // { name, ext, content }
+  mode: 'unified',                    // 'unified' | 'split'
+  gran: 'lines',                      // 'lines' | 'words' | 'chars'
+  lastDiff: null
+};
+
+// ── Supported extensions ─────────────────────────────────────
+const TEXT_EXTS = new Set([
+  'txt','md','markdown','rst','adoc',
+  'js','mjs','cjs','ts','tsx','jsx',
+  'py','rb','php','go','rs','java','c','cpp','cc','h','hpp','cs',
+  'sh','bash','zsh','fish','ps1','bat','cmd',
+  'json','yaml','yml','toml','ini','cfg','env','conf','config',
+  'html','htm','xml','svg','css','scss','sass','less',
+  'sql','graphql','gql',
+  'Makefile','Dockerfile','dockerfile',
+  'gitignore','editorconfig','prettierrc','eslintrc',
+  'lock','sum','mod'
+]);
+
+function isTextFile(name) {
+  if (!name.includes('.')) {
+    // no extension — allow common dotfiles
+    return /^(Makefile|Dockerfile|dockerfile|Gemfile|Rakefile|Vagrantfile)$/i.test(name);
+  }
+  const ext = name.split('.').pop().toLowerCase();
+  return TEXT_EXTS.has(ext);
+}
+
+function getExt(name) {
+  if (!name.includes('.')) return name.slice(0,4);
+  return name.split('.').pop().toLowerCase();
+}
+
+// ── DOM refs ─────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const heroSection   = $('heroSection');
+const workspace     = $('workspace');
+const heroDropA     = $('heroDropA');
+const heroDropB     = $('heroDropB');
+const heroDropALabel= $('heroDropALabel');
+const heroDropBLabel= $('heroDropBLabel');
+const heroCompareBtn= $('heroCompareBtn');
+const diffViewport  = $('diffViewport');
+const inputA        = $('inputA');
+const inputB        = $('inputB');
+const loadingOverlay= $('loadingOverlay');
+
+// ── Typewriter demo ──────────────────────────────────────────
+const DEMO_LINES = [
+  { t:'del', ln:'12', txt: "  result = calculate(a, b)" },
+  { t:'add', ln:'12', txt: "  result = calculate(a, b, strict=True)" },
+  { t:'ctx', ln:'13', txt: "  if result > threshold:" },
+  { t:'del', ln:'14', txt: '    print("below")' },
+  { t:'add', ln:'14', txt: '    logger.info("below threshold")' },
+  { t:'ctx', ln:'15', txt: "  return result" },
+];
+
+(function typewriterDemo() {
+  const el = $('demoContent');
+  if (!el) return;
+  let i = 0;
+  function addRow() {
+    if (i >= DEMO_LINES.length) return;
+    const d = DEMO_LINES[i++];
+    const row = document.createElement('div');
+    row.className = 'demo-row';
+    const cls = d.t === 'add' ? 'demo-added' : d.t === 'del' ? 'demo-removed' : 'demo-ctx';
+    const sign = d.t === 'add' ? '+' : d.t === 'del' ? '-' : ' ';
+    row.innerHTML = `<span class="demo-ln">${d.ln}</span><span class="${cls}">${sign} ${escHtml(d.txt)}</span>`;
+    el.appendChild(row);
+    setTimeout(addRow, 480);
+  }
+  setTimeout(addRow, 600);
+})();
+
+// ── Theme switcher ────────────────────────────────────────────
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.documentElement.setAttribute('data-theme', btn.dataset.themeTarget);
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ── File drop / pick ──────────────────────────────────────────
+function setupDropZone(zoneEl, version) {
+  zoneEl.addEventListener('click', () => {
+    (version === 'A' ? inputA : inputB).click();
+  });
+  zoneEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      (version === 'A' ? inputA : inputB).click();
+    }
+  });
+  zoneEl.addEventListener('dragover', e => { e.preventDefault(); zoneEl.classList.add('drag-over'); });
+  zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('drag-over'));
+  zoneEl.addEventListener('drop', e => {
+    e.preventDefault();
+    zoneEl.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) processFile(f, version);
+  });
+}
+
+setupDropZone(heroDropA, 'A');
+setupDropZone(heroDropB, 'B');
+
+inputA.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0], 'A'); inputA.value=''; });
+inputB.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0], 'B'); inputB.value=''; });
+
+$('reuploadA').addEventListener('click', () => inputA.click());
+$('reuploadB').addEventListener('click', () => inputB.click());
+
+function processFile(file, version) {
+  if (!isTextFile(file.name)) {
+    toast(`「${file.name}」看起來不是文字檔，可能無法正確比對`, 'error');
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('檔案超過 10 MB 限制', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = { name: file.name, ext: getExt(file.name), content: ev.target.result };
+    if (version === 'A') {
+      state.fileA = data;
+      const label = heroDropALabel;
+      if (label) { label.textContent = '✓ ' + file.name; heroDropA.classList.add('loaded'); }
+      updateChip('A', data);
+    } else {
+      state.fileB = data;
+      const label = heroDropBLabel;
+      if (label) { label.textContent = '✓ ' + file.name; heroDropB.classList.add('loaded'); }
+      updateChip('B', data);
+    }
+    heroCompareBtn.disabled = !(state.fileA && state.fileB);
+
+    // If in workspace mode and both files are ready, auto-re-compare
+    if (workspace.classList.contains('active') && state.fileA && state.fileB) {
+      runDiff();
+    }
+
+    toast(`${file.name} 已載入`, 'success');
+  };
+  reader.onerror = () => toast('檔案讀取失敗', 'error');
+  reader.readAsText(file, 'UTF-8');
+}
+
+function updateChip(version, data) {
+  if (version === 'A') {
+    $('chipAExt').textContent = data.ext;
+    $('chipAName').textContent = data.name;
+    $('chipA').title = data.name;
+  } else {
+    $('chipBExt').textContent = data.ext;
+    $('chipBName').textContent = data.name;
+    $('chipB').title = data.name;
+  }
+}
+
+// ── Compare trigger ───────────────────────────────────────────
+// heroCompareBtn is wired at bottom (paste-mode section) to handle both modes
+$('headerNewCompare').addEventListener('click', () => resetToHero());
+$('clearBtn').addEventListener('click', () => resetToHero());
+
+function enterWorkspace() {
+  state.inputMode = 'file';
+  $('toolbarFileInfo').style.display = 'flex';
+  $('toolbarPasteInfo').style.display = 'none';
+  heroSection.classList.add('hidden');
+  workspace.classList.add('active');
+  $('headerNewCompare').style.display = '';
+  runDiff();
+}
+
+function _resetToHeroBase() {
+  // Base reset — extended by paste-mode section below
+  workspace.classList.remove('active');
+  heroSection.classList.remove('hidden');
+  $('headerNewCompare').style.display = 'none';
+  state.fileA = null;
+  state.fileB = null;
+  state.lastDiff = null;
+  heroDropA.classList.remove('loaded');
+  heroDropB.classList.remove('loaded');
+  heroDropALabel.textContent = '點擊或拖放檔案';
+  heroDropBLabel.textContent = '點擊或拖放檔案';
+  heroCompareBtn.disabled = true;
+  diffViewport.innerHTML = '';
+}
+// resetToHero is fully defined in paste-mode section (calls _resetToHeroBase + clears paste state)
+
+// ── Mode / granularity controls ───────────────────────────────
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.mode = btn.dataset.mode;
+    if (state.lastDiff) renderDiff(state.lastDiff);
+  });
+});
+
+document.querySelectorAll('[data-gran]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-gran]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.gran = btn.dataset.gran;
+    if (state.fileA && state.fileB) runDiff();
+  });
+});
+
+// ── Diff engine ───────────────────────────────────────────────
+function runDiff() {
+  loadingOverlay.classList.add('active');
+  // defer so UI can update
+  setTimeout(() => {
+    try {
+      const a = state.fileA.content;
+      const b = state.fileB.content;
+      let rawDiff;
+
+      if (state.gran === 'lines') {
+        rawDiff = Diff.diffLines(a, b, { newlineIsToken: false });
+      } else if (state.gran === 'words') {
+        rawDiff = Diff.diffWordsWithSpace(a, b);
+      } else {
+        rawDiff = Diff.diffChars(a, b);
+      }
+
+      state.lastDiff = rawDiff;
+      renderDiff(rawDiff);
+    } catch(err) {
+      toast('比對失敗：' + err.message, 'error');
+    } finally {
+      loadingOverlay.classList.remove('active');
+    }
+  }, 30);
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderDiff(rawDiff) {
+  const isLines = state.gran === 'lines';
+
+  // Compute hunks (for line mode)
+  let hunks, stats;
+  if (isLines) {
+    ({ hunks, stats } = buildLineDiff(rawDiff));
+  } else {
+    stats = { added: 0, removed: 0, changes: 0 };
+  }
+
+  // Update stats ribbon
+  if (isLines) {
+    $('statAdded').textContent   = stats.added;
+    $('statRemoved').textContent = stats.removed;
+    $('statChanges').textContent = stats.changes;
+  } else {
+    // for word/char, count added/removed tokens
+    let a=0, r=0;
+    rawDiff.forEach(d => { if(d.added) a++; else if(d.removed) r++; });
+    $('statAdded').textContent   = a;
+    $('statRemoved').textContent = r;
+    $('statChanges').textContent = a + r;
+  }
+  $('statsFilename').textContent = `${state.fileA.name}  →  ${state.fileB.name}`;
+
+  // Render into viewport
+  if (state.mode === 'unified') {
+    if (isLines) renderUnified(hunks, stats);
+    else renderInlineWordChar(rawDiff);
+  } else {
+    if (isLines) renderSplit(hunks, stats);
+    else renderInlineWordChar(rawDiff); // split for word/char falls back gracefully
+  }
+}
+
+// ─ Line diff processing ───────────────────────────────────────
+function buildLineDiff(rawDiff) {
+  // Convert raw diff tokens to line objects
+  const lines = [];
+  let oldLine = 1, newLine = 1;
+  let added = 0, removed = 0;
+
+  rawDiff.forEach(part => {
+    const text = part.value;
+    const rows = text.split('\n');
+    // Remove last empty caused by trailing newline
+    if (rows[rows.length-1] === '') rows.pop();
+
+    rows.forEach(row => {
+      if (part.added) {
+        lines.push({ type: 'add', oldN: null, newN: newLine++, text: row });
+        added++;
+      } else if (part.removed) {
+        lines.push({ type: 'del', oldN: oldLine++, newN: null, text: row });
+        removed++;
+      } else {
+        lines.push({ type: 'ctx', oldN: oldLine++, newN: newLine++, text: row });
+      }
+    });
+  });
+
+  // Group into hunks (context = 3 lines around changes)
+  const CONTEXT = 3;
+  const changed = new Set(lines.map((l,i) => l.type !== 'ctx' ? i : -1).filter(i=>i>=0));
+  const visible = new Set();
+  changed.forEach(i => {
+    for (let j = Math.max(0,i-CONTEXT); j <= Math.min(lines.length-1,i+CONTEXT); j++) visible.add(j);
+  });
+
+  const hunks = [];
+  let hunk = null;
+  lines.forEach((line, i) => {
+    if (visible.has(i)) {
+      if (!hunk) { hunk = []; hunks.push(hunk); }
+      hunk.push(line);
+    } else {
+      hunk = null;
+    }
+  });
+
+  return { hunks, stats: { added, removed, changes: added + removed } };
+}
+
+// ─ Unified render ─────────────────────────────────────────────
+function renderUnified(hunks, stats) {
+  if (stats.changes === 0) { diffViewport.innerHTML = noDiffHtml(); return; }
+
+  const table = document.createElement('table');
+  table.className = 'diff-table unified';
+  table.setAttribute('role','table');
+  table.setAttribute('aria-label','差異比對結果（unified view）');
+  const tb = document.createElement('tbody');
+
+  hunks.forEach((hunk, hi) => {
+    if (hi > 0) {
+      const tr = document.createElement('tr');
+      tr.className = 'diff-row-hunk';
+      tr.innerHTML = `<td colspan="4" class="diff-hunk-td">@@ 差異區段 ${hi+1} @@</td>`;
+      tb.appendChild(tr);
+    }
+    hunk.forEach(line => {
+      const tr = document.createElement('tr');
+      tr.className = line.type === 'add' ? 'diff-row-add' : line.type === 'del' ? 'diff-row-del' : 'diff-row-ctx';
+
+      const oldN  = line.type !== 'add' ? line.oldN : '';
+      const newN  = line.type !== 'del' ? line.newN : '';
+      const sign  = line.type === 'add' ? '+' : line.type === 'del' ? '-' : '';
+      const signC = line.type === 'add' ? 'add' : line.type === 'del' ? 'del' : '';
+      const codeC = line.type === 'add' ? 'add' : line.type === 'del' ? 'del' : '';
+      const gutC  = line.type !== 'ctx' ? line.type : '';
+
+      tr.innerHTML = `
+        <td class="diff-gutter ${gutC}" aria-hidden="true">${oldN}</td>
+        <td class="diff-gutter ${gutC}" aria-hidden="true">${newN}</td>
+        <td class="diff-sign ${signC}" aria-hidden="true">${sign}</td>
+        <td class="diff-code ${codeC}">${escHtml(line.text)}</td>`;
+      tb.appendChild(tr);
+    });
+  });
+
+  table.appendChild(tb);
+  diffViewport.innerHTML = '';
+  diffViewport.appendChild(table);
+}
+
+// ─ Split render ───────────────────────────────────────────────
+function renderSplit(hunks, stats) {
+  if (stats.changes === 0) { diffViewport.innerHTML = noDiffHtml(); return; }
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'diff-split-wrapper';
+
+  const paneL = document.createElement('div');
+  paneL.className = 'diff-split-pane';
+  paneL.innerHTML = `<div class="split-header"><span>${escHtml(state.fileA.name)}</span><span style="color:var(--diff-del-num)">─ 舊版本</span></div>`;
+
+  const paneR = document.createElement('div');
+  paneR.className = 'diff-split-pane';
+  paneR.innerHTML = `<div class="split-header"><span>${escHtml(state.fileB.name)}</span><span style="color:var(--diff-add-num)">+ 新版本</span></div>`;
+
+  const tL = document.createElement('table'); tL.className = 'diff-table'; const tbL = document.createElement('tbody'); tL.appendChild(tbL);
+  const tR = document.createElement('table'); tR.className = 'diff-table'; const tbR = document.createElement('tbody'); tR.appendChild(tbR);
+
+  hunks.forEach((hunk, hi) => {
+    if (hi > 0) {
+      [tbL, tbR].forEach(tb => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="3" class="diff-hunk-td">…</td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    hunk.forEach(line => {
+      const addRow = (tb, gutter, code, cls) => {
+        const tr = document.createElement('tr');
+        if (cls) tr.className = cls;
+        tr.innerHTML = `<td class="diff-gutter ${cls ? cls.replace('diff-row-','') : ''}" aria-hidden="true">${gutter}</td><td class="diff-sign"></td><td class="diff-code ${cls === 'diff-row-add' ? 'add' : cls === 'diff-row-del' ? 'del' : ''}">${code}</td>`;
+        tb.appendChild(tr);
+      };
+
+      if (line.type === 'add') {
+        addRow(tbL, '', '', '');
+        addRow(tbR, line.newN, escHtml(line.text), 'diff-row-add');
+      } else if (line.type === 'del') {
+        addRow(tbL, line.oldN, escHtml(line.text), 'diff-row-del');
+        addRow(tbR, '', '', '');
+      } else {
+        addRow(tbL, line.oldN, escHtml(line.text), '');
+        addRow(tbR, line.newN, escHtml(line.text), '');
+      }
+    });
+  });
+
+  paneL.appendChild(tL);
+  paneR.appendChild(tR);
+  wrapper.appendChild(paneL);
+  wrapper.appendChild(paneR);
+  diffViewport.innerHTML = '';
+  diffViewport.appendChild(wrapper);
+}
+
+// ─ Word / char inline render ──────────────────────────────────
+function renderInlineWordChar(rawDiff) {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'padding:20px;font-family:var(--font-code);font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;background:var(--diff-ctx-bg);';
+
+  rawDiff.forEach(part => {
+    const span = document.createElement('span');
+    const text = escHtml(part.value);
+    if (part.added) {
+      span.className = 'word-add';
+      span.style.color = 'var(--diff-add-text)';
+    } else if (part.removed) {
+      span.className = 'word-del';
+      span.style.color = 'var(--diff-del-text)';
+      span.style.textDecoration = 'line-through';
+    }
+    span.innerHTML = text;
+    wrapper.appendChild(span);
+  });
+
+  diffViewport.innerHTML = '';
+  diffViewport.appendChild(wrapper);
+}
+
+// ─ No-diff placeholder ────────────────────────────────────────
+function noDiffHtml() {
+  return `<div class="no-diff"><div class="no-diff-icon">✓</div><div>兩個檔案內容完全相同</div><div style="font-size:12px;color:var(--text-faint)">沒有任何差異</div></div>`;
+}
+
+// ── Copy ──────────────────────────────────────────────────────
+$('copyBtn').addEventListener('click', () => {
+  const text = diffViewport.innerText || diffViewport.textContent;
+  if (!text.trim()) { toast('沒有可複製的結果', 'error'); return; }
+  navigator.clipboard.writeText(text)
+    .then(() => toast('已複製到剪貼簿', 'success'))
+    .catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); toast('已複製到剪貼簿', 'success'); } catch(e) { toast('無法複製', 'error'); }
+      ta.remove();
+    });
+});
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  $('toastContainer').appendChild(el);
+  requestAnimationFrame(() => { requestAnimationFrame(() => el.classList.add('visible')); });
+  setTimeout(() => {
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 300);
+  }, 3200);
+}
+
+// ── Escape HTML ───────────────────────────────────────────────
+function escHtml(str) {
+  return str
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INPUT MODE — tab switching (file ↔ paste)
+// ═══════════════════════════════════════════════════════════
+
+// Track current input mode in state
+state.inputMode = 'file'; // 'file' | 'paste'
+
+const tabFile  = $('tabFile');
+const tabPaste = $('tabPaste');
+const panelFile  = $('panelFile');
+const panelPaste = $('panelPaste');
+
+function switchInputTab(mode) {
+  state.inputMode = mode;
+
+  // Tab buttons
+  tabFile.classList.toggle('active',  mode === 'file');
+  tabPaste.classList.toggle('active', mode === 'paste');
+  tabFile.setAttribute('aria-selected',  String(mode === 'file'));
+  tabPaste.setAttribute('aria-selected', String(mode === 'paste'));
+
+  // Panels
+  panelFile.classList.toggle('active',  mode === 'file');
+  panelPaste.classList.toggle('active', mode === 'paste');
+}
+
+tabFile.addEventListener('click',  () => switchInputTab('file'));
+tabPaste.addEventListener('click', () => switchInputTab('paste'));
+
+// Keyboard navigation for tabs (←/→ arrows per ARIA spec)
+[tabFile, tabPaste].forEach((btn, i, arr) => {
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); arr[(i+1)%arr.length].focus(); arr[(i+1)%arr.length].click(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); arr[(i-1+arr.length)%arr.length].focus(); arr[(i-1+arr.length)%arr.length].click(); }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  PASTE MODE — textarea logic
+// ═══════════════════════════════════════════════════════════
+
+const pasteA        = $('pasteA');
+const pasteB        = $('pasteB');
+const pasteAMeta    = $('pasteAMeta');
+const pasteBMeta    = $('pasteBMeta');
+const pasteCompareBtn = $('pasteCompareBtn');
+const pasteClearA   = $('pasteClearA');
+const pasteClearB   = $('pasteClearB');
+
+function updatePasteMeta(ta, metaEl) {
+  const v = ta.value;
+  const lines = v === '' ? 0 : v.split('\n').length;
+  const chars = v.length;
+  metaEl.textContent = `${lines} 行 · ${chars.toLocaleString()} 字元`;
+  ta.classList.toggle('has-content', v.trim().length > 0);
+}
+
+function checkPasteReady() {
+  pasteCompareBtn.disabled = !(pasteA.value.trim() || pasteB.value.trim());
+  // allow comparing even if one side is empty (useful: "what was added?")
+  pasteCompareBtn.disabled = false;
+  // actually require at least one side non-empty to be meaningful
+  pasteCompareBtn.disabled = !(pasteA.value.length > 0 || pasteB.value.length > 0);
+}
+
+pasteA.addEventListener('input', () => { updatePasteMeta(pasteA, pasteAMeta); checkPasteReady(); });
+pasteB.addEventListener('input', () => { updatePasteMeta(pasteB, pasteBMeta); checkPasteReady(); });
+
+pasteClearA.addEventListener('click', () => {
+  pasteA.value = '';
+  updatePasteMeta(pasteA, pasteAMeta);
+  checkPasteReady();
+  pasteA.focus();
+});
+
+pasteClearB.addEventListener('click', () => {
+  pasteB.value = '';
+  updatePasteMeta(pasteB, pasteBMeta);
+  checkPasteReady();
+  pasteB.focus();
+});
+
+// ── Paste compare trigger ─────────────────────────────────
+pasteCompareBtn.addEventListener('click', () => {
+  enterPasteWorkspace();
+});
+
+function enterPasteWorkspace() {
+  // Build synthetic "file" objects so the diff engine is unchanged
+  const contentA = pasteA.value;
+  const contentB = pasteB.value;
+
+  state.fileA = { name: '版本 A', ext: 'txt', content: contentA };
+  state.fileB = { name: '版本 B', ext: 'txt', content: contentB };
+  state.inputMode = 'paste';
+
+  // Switch toolbar display
+  $('toolbarFileInfo').style.display = 'none';
+  const tpi = $('toolbarPasteInfo');
+  tpi.style.display = 'flex';
+
+  // Update stats label
+  $('statsFilename').textContent = '版本 A  →  版本 B（貼上模式）';
+
+  heroSection.classList.add('hidden');
+  workspace.classList.add('active');
+  $('headerNewCompare').style.display = '';
+  runDiff();
+}
+
+// ── "Edit paste content" → back to paste panel ────────────
+$('editPasteBtn').addEventListener('click', () => {
+  // Return to hero, paste tab open, content preserved
+  workspace.classList.remove('active');
+  heroSection.classList.remove('hidden');
+  $('headerNewCompare').style.display = 'none';
+  state.lastDiff = null;
+  diffViewport.innerHTML = '';
+  switchInputTab('paste');
+  // restore toolbar state for next entry
+  $('toolbarFileInfo').style.display = 'flex';
+  $('toolbarPasteInfo').style.display = 'none';
+  pasteA.focus();
+});
+
+// ── Full reset — handles both file and paste modes ────────
+function resetToHero() {
+  _resetToHeroBase();
+  state.inputMode = 'file';
+
+  // reset paste textareas
+  pasteA.value = '';
+  pasteB.value = '';
+  pasteA.classList.remove('has-content');
+  pasteB.classList.remove('has-content');
+  pasteAMeta.textContent = '0 行 · 0 字元';
+  pasteBMeta.textContent = '0 行 · 0 字元';
+  pasteCompareBtn.disabled = true;
+
+  // reset toolbar
+  $('toolbarFileInfo').style.display = 'flex';
+  $('toolbarPasteInfo').style.display = 'none';
+
+  // return to file tab
+  switchInputTab('file');
+}
+
+// ── Tab-aware heroCompareBtn: wire for file mode ─────────
+heroCompareBtn.addEventListener('click', () => {
+  if (state.fileA && state.fileB) {
+    state.inputMode = 'file';
+    $('toolbarFileInfo').style.display = 'flex';
+    $('toolbarPasteInfo').style.display = 'none';
+    enterWorkspace();
+  }
+});
+
+</script>
+</body>
+</html>

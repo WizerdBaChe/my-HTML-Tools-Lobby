@@ -10,7 +10,7 @@
 		"supportsIframe": false,
 		"status": "ready",
 		"featured": true,
-		"isNew": true,
+		"isNew": false,
 		"order": 1,
 		"updatedAt": "2026-06-13"
 	},
@@ -25,16 +25,16 @@
 		"supportsIframe": true,
 		"status": "ready",
 		"featured": true,
-		"isNew": true,
+		"isNew": false,
 		"order": 2,
 		"updatedAt": "2026-06-11"
     },
     {
-		"id": "html-live",
+		"id": "Html-live",
 		"name": "HTML 預覽器",
 		"name_en": "HTML Live Preview",
 		"description": "貼上 HTML 程式碼或上傳 .html 檔，即時在沙箱中渲染預覽。支援產生分享連結，透過 URL hash 編碼還原畫面，無需後端。",
-		"path": "./tools/html-live/",
+		"path": "./tools/Html-live/",
 		"category": "developer",
 		"tags": ["html", "preview", "sandbox", "iframe", "share","web","file-processer"],
 		"supportsIframe": true,
@@ -43,6 +43,21 @@
 		"isNew": true,
 		"order": 3,
 		"updatedAt": "2026-06-16"
+    },
+	{
+		"id": "DiffLens",
+		"name": "文字比對工具",
+		"name_en": "Text diffrence preview",
+		"description": "貼上文字或上傳各類型純文字檔(包含md,py,json...)，即時比較前後差異。",
+		"path": "./tools/DiffLens/",
+		"category": "developer",
+		"tags": [ "preview","web","file-processer","text"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 4,
+		"updatedAt": "2026-06-17"
     },
     {
 		"id": "Background-Remover",
@@ -56,7 +71,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 4,
+		"order": 5,
 		"updatedAt": "2026-06-11"
     },
     {
@@ -71,7 +86,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 5,
+		"order": 6,
 		"updatedAt": "2026-06-11"
 	}
 ]
