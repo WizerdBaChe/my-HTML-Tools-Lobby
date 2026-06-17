@@ -88,5 +88,20 @@
 		"isNew": false,
 		"order": 6,
 		"updatedAt": "2026-06-11"
-	}
+	},
+	{
+		"id": "QR-Code-Producer",
+		"name": "QR扣產生器",
+		"name_en": "QR-Code-Producer",
+		"description": "貼上任意內容後，可以生成分享用的QR扣",
+		"path": "./tools/QR-Code-Producer/",
+		"category": "developer",
+		"tags": ["html","share","web","file-processer","text"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 7,
+		"updatedAt": "2026-06-18"
+    }
 ]

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QR Code 生成器</title>
+
+  <!-- archlens-theme: 換成你自己的路徑即可 -->
+  <link rel="stylesheet" href="libs/archlens-theme.css">
+
+  <style>
+    /* ── 版面結構（純佈局，不含顏色/字體/圓角，那些全交給 archlens-theme） ── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 32px 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      margin-bottom: 32px;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--al-ink);
+      margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px;
+      color: var(--al-slate-500);
+      margin: 0;
+    }
+
+    /* ── Main Grid ── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ── Control Panel ── */
+    .control-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Form labels / groups ── */
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--al-slate-400);
+      margin-bottom: 6px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group:last-child { margin-bottom: 0; }
+
+    textarea.form-control,
+    select.form-control {
+      display: block;
+      width: 100%;
+      font-family: var(--al-font-body);
+      font-size: 13px;
+      color: var(--al-ink);
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      padding: 10px 12px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    textarea.form-control {
+      resize: vertical;
+      min-height: 88px;
+    }
+    select.form-control {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231A1A1A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+    textarea.form-control:focus,
+    select.form-control:focus {
+      border-color: var(--al-accent);
+      box-shadow: 0 0 0 3px var(--al-accent-soft);
+    }
+
+    /* ── Colour pickers row ── */
+    .color-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .color-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .color-input-wrap:hover { border-color: var(--al-accent); }
+    .color-input-wrap input[type="color"] {
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 50%;
+      padding: 0;
+      cursor: pointer;
+      background: transparent;
+    }
+    .color-input-wrap span {
+      font-size: 12px;
+      color: var(--al-slate-500);
+      font-family: var(--al-font-mono);
+    }
+
+    /* ── File upload ── */
+    .file-upload-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--al-bg-alt);
+      border: 1px dashed var(--al-border);
+      border-radius: var(--al-radius-md);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--al-slate-500);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      width: 100%;
+      justify-content: center;
+    }
+    .file-upload-label:hover {
+      border-color: var(--al-accent);
+      background: var(--al-accent-soft);
+      color: var(--al-accent);
+    }
+    input.file-input { display: none; }
+
+    .logo-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: var(--al-accent-soft);
+      border: 1px solid var(--al-accent-border);
+      border-radius: var(--al-radius-md);
+    }
+    .logo-preview img {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+    .logo-preview .logo-name {
+      font-size: 12px;
+      color: var(--al-accent);
+      flex: 1;
+    }
+
+    /* ── Warning ── */
+    .warning-message {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: var(--al-radius-md);
+      font-size: 12px;
+    }
+
+    /* ── Preview Panel ── */
+    .preview-panel {
+      position: sticky;
+      top: 32px;
+    }
+
+    .qr-preview-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 320px;
+      position: relative;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .empty-state__icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+    .empty-state h3 {
+      font-family: var(--al-font-body);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--al-ink);
+      margin: 0 0 6px;
+    }
+    .empty-state p {
+      font-size: 12px;
+      color: var(--al-slate-400);
+      margin: 0;
+    }
+
+    .loading-spinner {
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--al-accent-soft);
+      border-top-color: var(--al-accent);
+      border-radius: 50%;
+      animation: al-spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    .loading-spinner p {
+      font-size: 12px;
+      color: var(--al-slate-400);
+      margin: 0;
+      font-family: var(--al-font-mono);
+    }
+
+    .qr-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: qrFadeIn 0.3s ease-out;
+    }
+    #qrCanvas {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #qrCanvas canvas,
+    #qrCanvas img {
+      border-radius: var(--al-radius-sm);
+      display: block;
+    }
+
+    /* ── Download Section ── */
+    .download-section {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .download-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Status message ── */
+    .status-message {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: var(--al-radius-md);
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      font-family: var(--al-font-mono);
+    }
+    .status-message.success {
+      background: #DCFCE7;
+      color: #166534;
+      border: 1px solid #BBF7D0;
+    }
+    .status-message.error {
+      background: var(--al-error-bg);
+      border: 1px solid var(--al-error-border);
+      color: var(--al-error-text);
+    }
+    .status-message.info {
+      background: var(--al-accent-soft);
+      border: 1px solid var(--al-accent-border);
+      color: var(--al-accent);
+    }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+
+    /* ── Animations ── */
+    @keyframes qrFadeIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .main { grid-template-columns: 1fr; }
+      .preview-panel { position: static; }
+      .download-buttons { grid-template-columns: 1fr; }
+      .color-controls { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body class="al-root">
+<div class="container">
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="header-top">
+      <span class="al-badge">Browser Only</span>
+    </div>
+    <h1 class="al-display">QR Code 生成器</h1>
+    <p>輸入內容，即時產生可下載的 QR Code — 全程在瀏覽器中完成，無需安裝任何工具</p>
+  </header>
+
+  <main class="main">
+
+    <!-- ── 左側：輸入與設定 ── -->
+    <section class="control-panel">
+
+      <!-- 內容輸入卡片 -->
+      <div class="al-card">
+        <!-- macOS 風格標題列 -->
+        <div class="al-window-bar">
+          <span class="al-window-dot al-window-dot--red"></span>
+          <span class="al-window-dot al-window-dot--yellow"></span>
+          <span class="al-window-dot al-window-dot--green"></span>
+          <span class="al-window-filename">content.txt</span>
+        </div>
+        <div style="padding: 16px;">
+          <div class="form-group">
+            <label for="textInput" class="form-label">QR Code 內容</label>
+            <textarea id="textInput" class="form-control"
+              placeholder="輸入文字、網址、或任意內容…" rows="4"></textarea>
+            <div id="lengthWarning" class="al-alert al-alert--warn warning-message hidden">
+              ⚠️ 文字過長可能導致 QR Code 過於密集，建議縮短內容
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 進階設定卡片 -->
+      <div class="al-card">
+        <div class="al-window-bar">
+          <span class="al-window-dot al-window-dot--red"></span>
+          <span class="al-window-dot al-window-dot--yellow"></span>
+          <span class="al-window-dot al-window-dot--green"></span>
+          <span class="al-window-filename">settings</span>
+        </div>
+        <div style="padding: 16px;">
+
+          <div class="form-group">
+            <label for="sizeSelect" class="form-label">尺寸大小</label>
+            <select id="sizeSelect" class="form-control">
+              <option value="128">小型 (128px)</option>
+              <option value="256" selected>中型 (256px)</option>
+              <option value="512">大型 (512px)</option>
+              <option value="1024">超大 (1024px)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="errorLevel" class="form-label">錯誤校正等級</label>
+            <select id="errorLevel" class="form-control">
+              <option value="L">低 (L · ~7%)</option>
+              <option value="M" selected>中 (M · ~15%)</option>
+              <option value="Q">高 (Q · ~25%)</option>
+              <option value="H">最高 (H · ~30%)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">顏色設定</label>
+            <div class="color-controls">
+              <div>
+                <div class="form-label" style="margin-bottom:4px;">前景色</div>
+                <label class="color-input-wrap">
+                  <input type="color" id="foregroundColor" value="#000000"/>
+                  <span id="fgColorLabel">#000000</span>
+                </label>
+              </div>
+              <div>
+                <div class="form-label" style="margin-bottom:4px;">背景色</div>
+                <label class="color-input-wrap">
+                  <input type="color" id="backgroundColor" value="#FFFFFF"/>
+                  <span id="bgColorLabel">#FFFFFF</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Logo 圖片（可選）</label>
+            <label for="logoUpload" class="file-upload-label">
+              ＋ 選取圖片（PNG / JPG / SVG）
+            </label>
+            <input type="file" id="logoUpload" class="file-input" accept="image/*"/>
+            <div id="logoPreview" class="logo-preview hidden">
+              <img id="logoImage" src="" alt="Logo 預覽"/>
+              <span class="logo-name">Logo 已載入</span>
+              <button id="removeLogo" class="al-btn al-btn--toolbar al-btn--secondary">移除</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 右側：預覽與下載 ── -->
+    <section class="preview-panel">
+
+      <div class="al-card al-card--float qr-preview-container">
+
+        <!-- 空白狀態 -->
+        <div id="emptyState" class="empty-state">
+          <div class="empty-state__icon">📱</div>
+          <h3>開始建立 QR Code</h3>
+          <p>在左側輸入內容，即時預覽</p>
+        </div>
+
+        <!-- 載入中 -->
+        <div id="loadingSpinner" class="loading-spinner hidden">
+          <div class="spinner"></div>
+          <p>產生中<span class="al-typewriter-cursor"></span></p>
+        </div>
+
+        <!-- QR Code 預覽 -->
+        <div id="qrPreview" class="qr-preview hidden">
+          <div id="qrCanvas"></div>
+        </div>
+
+      </div>
+
+      <!-- 下載與狀態 -->
+      <div class="download-section">
+        <div class="download-buttons">
+          <button id="downloadPNG" class="al-btn al-btn--primary" disabled>
+            ↓ 下載 PNG
+          </button>
+          <button id="downloadSVG" class="al-btn al-btn--secondary" disabled>
+            ↓ 下載 SVG
+          </button>
+        </div>
+        <div id="statusMessage" class="status-message"></div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<!-- QR Code 庫（自行下載放到 libs/ 目錄） -->
+<script src="libs/qrcode.min.js"></script>
+
+<script>
+class QRCodeApp {
+  constructor() {
+    this.qr = null;
+    this.currentLogo = null;
+    this.debounceTimer = null;
+    this.elements = {};
+    this.settings = {
+      size: 256,
+      errorLevel: 'M',
+      fgColor: '#000000',
+      bgColor: '#FFFFFF',
+      margin: 4
+    };
+    this.messages = {
+      tooLong: '⚠️ 文字過長，建議縮短內容',
+      success: '✅ QR Code 產生成功',
+      logoProcessing: '正在載入 Logo…',
+      error: '❌ 產生失敗，請檢查輸入內容'
+    };
+  }
+
+  init() {
+    try {
+      this.bindElements();
+      this.bindEvents();
+      this.showEmpty();
+    } catch (e) {
+      console.error('初始化失敗', e);
+    }
+  }
+
+  bindElements() {
+    [
+      'textInput','sizeSelect','errorLevel','foregroundColor','backgroundColor',
+      'logoUpload','logoPreview','logoImage','removeLogo',
+      'emptyState','loadingSpinner','qrPreview','qrCanvas',
+      'downloadPNG','downloadSVG','lengthWarning','statusMessage',
+      'fgColorLabel','bgColorLabel'
+    ].forEach(id => {
+      this.elements[id] = document.getElementById(id);
+      if (!this.elements[id]) throw new Error(`#${id} 未找到`);
+    });
+  }
+
+  bindEvents() {
+    const e = this.elements;
+    e.textInput.addEventListener('input', () => {
+      this.checkLength();
+      this.debounce(this.generate.bind(this), 250)();
+    });
+    ['sizeSelect','errorLevel'].forEach(id => {
+      e[id].addEventListener('change', () => {
+        this.updateSettings();
+        this.debounce(this.generate.bind(this), 250)();
+      });
+    });
+    e.foregroundColor.addEventListener('input', () => {
+      e.fgColorLabel.textContent = e.foregroundColor.value;
+      this.updateSettings();
+      this.debounce(this.generate.bind(this), 250)();
+    });
+    e.backgroundColor.addEventListener('input', () => {
+      e.bgColorLabel.textContent = e.backgroundColor.value;
+      this.updateSettings();
+      this.debounce(this.generate.bind(this), 250)();
+    });
+    e.logoUpload.addEventListener('change', ev => this.handleLogo(ev.target.files[0]));
+    e.removeLogo.addEventListener('click', () => this.removeLogo());
+    e.downloadPNG.addEventListener('click', () => this.download('png'));
+    e.downloadSVG.addEventListener('click', () => this.download('svg'));
+  }
+
+  updateSettings() {
+    const e = this.elements;
+    this.settings.size = +e.sizeSelect.value;
+    this.settings.errorLevel = e.errorLevel.value;
+    this.settings.fgColor = e.foregroundColor.value;
+    this.settings.bgColor = e.backgroundColor.value;
+  }
+
+  checkLength() {
+    const len = this.elements.textInput.value.length;
+    this.elements.lengthWarning.classList.toggle('hidden', len <= 100);
+  }
+
+  showEmpty()   { this.toggleStates('empty');   this.disableDownloads(); this.clearStatus(); }
+  showLoading() { this.toggleStates('loading'); }
+  showPreview() { this.toggleStates('preview'); this.enableDownloads(); }
+
+  toggleStates(state) {
+    const e = this.elements;
+    e.emptyState.classList.toggle('hidden',       state !== 'empty');
+    e.loadingSpinner.classList.toggle('hidden',   state !== 'loading');
+    e.qrPreview.classList.toggle('hidden',        state !== 'preview');
+  }
+
+  enableDownloads()  { this.elements.downloadPNG.disabled = false; this.elements.downloadSVG.disabled = false; }
+  disableDownloads() { this.elements.downloadPNG.disabled = true;  this.elements.downloadSVG.disabled = true;  }
+
+  clearStatus() {
+    const m = this.elements.statusMessage;
+    m.textContent = '';
+    m.className = 'status-message';
+  }
+  showStatus(txt, type = 'info') {
+    const m = this.elements.statusMessage;
+    m.textContent = txt;
+    m.className = `status-message ${type}`;
+    setTimeout(() => this.clearStatus(), 3000);
+  }
+
+  debounce(fn, delay) {
+    return () => {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(fn, delay);
+    };
+  }
+
+  async generate() {
+    const text = this.elements.textInput.value.trim();
+    if (!text) return this.showEmpty();
+
+    this.showLoading();
+    await new Promise(r => setTimeout(r, 80));
+
+    try {
+      this.elements.qrCanvas.innerHTML = '';
+      this.qr = new QRCode(this.elements.qrCanvas, {
+        text,
+        width:        this.settings.size,
+        height:       this.settings.size,
+        colorDark:    this.settings.fgColor,
+        colorLight:   this.settings.bgColor,
+        correctLevel: QRCode.CorrectLevel[this.settings.errorLevel]
+      });
+
+      if (this.currentLogo) await this.drawLogo();
+
+      this.showPreview();
+      this.showStatus(this.messages.success, 'success');
+    } catch (err) {
+      console.error(err);
+      this.showEmpty();
+      this.showStatus(this.messages.error, 'error');
+    }
+  }
+
+  handleLogo(file) {
+    if (!file) return;
+    this.showStatus(this.messages.logoProcessing, 'info');
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        this.currentLogo = img;
+        this.elements.logoPreview.classList.remove('hidden');
+        this.debounce(this.generate.bind(this), 250)();
+      };
+      img.src = ev.target.result;
+      this.elements.logoImage.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removeLogo() {
+    this.currentLogo = null;
+    this.elements.logoPreview.classList.add('hidden');
+    this.elements.logoUpload.value = '';
+    this.debounce(this.generate.bind(this), 250)();
+  }
+
+  async drawLogo() {
+    const canvasEl = this.elements.qrCanvas.querySelector('canvas');
+    if (!canvasEl) throw new Error('找不到 Canvas');
+    const ctx = canvasEl.getContext('2d');
+    const size = this.settings.size;
+    const maxLogo = size * 0.28;
+    const lw = Math.min(maxLogo, this.currentLogo.width);
+    const lh = Math.min(maxLogo, this.currentLogo.height);
+    const x = (size - lw) / 2;
+    const y = (size - lh) / 2;
+    ctx.fillStyle = this.settings.bgColor;
+    ctx.fillRect(x - 5, y - 5, lw + 10, lh + 10);
+    ctx.drawImage(this.currentLogo, x, y, lw, lh);
+  }
+
+  download(format) {
+    if (format === 'png') {
+      const canvasEl = this.elements.qrCanvas.querySelector('canvas');
+      if (!canvasEl) return;
+      const link = document.createElement('a');
+      link.href = canvasEl.toDataURL('image/png');
+      link.download = 'qrcode.png';
+      link.click();
+    } else {
+      const svgEl = this.elements.qrCanvas.querySelector('svg');
+      if (!svgEl) return;
+      const blob = new Blob([svgEl.outerHTML], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'qrcode.svg';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => new QRCodeApp().init());
+</script>
+</body>
+</html>
