@@ -32,7 +32,7 @@
     {
 		"id": "Html-live",
 		"name": "HTML 預覽器",
-		"name_en": "HTML Live Preview",
+		"name_en": "Html-live",
 		"description": "貼上 HTML 程式碼或上傳 .html 檔，即時在沙箱中渲染預覽。支援產生分享連結，透過 URL hash 編碼還原畫面，無需後端。",
 		"path": "./tools/Html-live/",
 		"category": "developer",
