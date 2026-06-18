@@ -1,342 +1,420 @@
-// 應用程式狀態管理
-const AppState = {
-  IDLE: 'idle',
-  IMAGE_LOADED: 'image_loaded',
-  PROCESSING: 'processing',
-  DONE: 'done'
-};
+// ============================================================
+// 1. 後端核心優化運算引擎 (邊界連通域洪泛演算法版)
+// ============================================================
+function removeBackground(imageData, targetColor, tolerance, options = {}) {
+  const { width, height } = imageData;
+  const originalData = imageData.data;
+  const resultData = new Uint8ClampedArray(originalData);
 
-// 參數設置
-const CONFIG = {
-  defaultTolerance: 30,
-  maxFileSize: 10485760, // 10MB
-  maxResolution: 4000,
-  supportedFormats: ['image/png', 'image/jpeg', 'image/webp'],
-  debounceDelay: 150
-};
+  const featherZone = options.featherZone !== undefined ? options.featherZone : 20;
+  const enableSpillComp = options.enableSpillComp !== undefined ? options.enableSpillComp : true;
+  
+  const isWhiteBg = targetColor.r > 220 && targetColor.g > 220 && targetColor.b > 220;
+  const isBlackBg = targetColor.r < 35 && targetColor.g < 35 && targetColor.b < 35;
 
-// 全域變數
-let currentState = AppState.IDLE;
-let originalImageData = null;
-let originalCanvas = null;
-let previewCanvas = null;
-let originalCtx = null;
-let previewCtx = null;
-let targetColor = { r: 255, g: 255, b: 255 };
-let tolerance = CONFIG.defaultTolerance;
-let isEyedropperActive = false;
-let currentImage = null;
-let elements = {};
+  // 感知色彩距離
+  function getPerceptualDistance(r1, g1, b1, r2, g2, b2) {
+    const dr = r1 - r2;
+    const dg = g1 - g2;
+    const db = b1 - b2;
+    let rWeight = 0.299, gWeight = 0.587, bWeight = 0.114;
 
-// Debounce工具函式
-function debounce(func, delay) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), delay);
-  };
-}
-
-// RGB歐氏距離
-function calculateColorDistance(color1, color2) {
-  const deltaR = color1.r - color2.r;
-  const deltaG = color1.g - color2.g;
-  const deltaB = color1.b - color2.b;
-  return Math.sqrt(deltaR ** 2 + deltaG ** 2 + deltaB ** 2);
-}
-
-// 去背核心演算法
-function removeBackground(imageData, targetColor, tolerance) {
-  const data = new Uint8ClampedArray(imageData.data);
-  for (let i = 0; i < data.length; i += 4) {
-    const pixel = { r: data[i], g: data[i+1], b: data[i+2] };
-    const distance = calculateColorDistance(pixel, targetColor);
-    if (distance <= tolerance) data[i+3] = 0; // alpha透明
+    if (isWhiteBg || isBlackBg) {
+      rWeight = 0.333; gWeight = 0.333; bWeight = 0.333;
+    }
+    return Math.sqrt(dr * dr * rWeight + dg * dg * gWeight + db * db * bWeight);
   }
-  return new ImageData(data, imageData.width, imageData.height);
-}
 
-function setState(newState) {
-  currentState = newState;
-  updateUI();
-  updateStatusDisplay();
-}
+  // --------------------------------------------------------
+  // 【核心升級】第一階段：建立邊界連通性遮罩 (Spatial Connectedness Mask)
+  // --------------------------------------------------------
+  const connectedMask = new Uint8Array(width * height); 
+  const queueX = new Int32Array(width * height);
+  const queueY = new Int32Array(width * height);
+  let head = 0;
+  let tail = 0;
 
-function updateStatusDisplay() {
-  const text = elements.statusText;
-  const msgs = {
-    [AppState.IDLE]: '等待上傳圖片...',
-    [AppState.IMAGE_LOADED]: '圖片已載入，點擊原圖選擇要去背的顏色',
-    [AppState.PROCESSING]: '處理中，請稍候...',
-    [AppState.DONE]: '處理完成，可下載圖片'
-  };
-  text.textContent = msgs[currentState] || '';
-}
+  // 輔助檢驗像素是否匹配背景條件
+  function isBackgroundPixel(x, y) {
+    const idx = (y * width + x) * 4;
+    const r = originalData[idx];
+    const g = originalData[idx + 1];
+    const b = originalData[idx + 2];
+    
+    let distance = getPerceptualDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
+    
+    // 針對白底陰影進行動態容差補償，使其更容易被包含在蔓延範圍內
+    if (isWhiteBg) {
+      const brightness = (r + g + b) / 3;
+      if (brightness > 140) distance += (brightness - 140) * 0.3;
+    }
+    
+    // 只要色差在容差與羽化過渡帶的大極限內，皆視為潛在連通背景
+    return distance <= (tolerance + featherZone);
+  }
 
-function updateUI() {
-  const isIdle = currentState === AppState.IDLE;
-  const hasImage = currentState !== AppState.IDLE;
-  const isProcessing = currentState === AppState.PROCESSING;
-  const canDownload = currentState === AppState.IMAGE_LOADED || currentState === AppState.DONE;
-  elements.previewSection.classList.toggle('hidden', isIdle);
-  elements.controlsSection.classList.toggle('hidden', isIdle);
-  elements.eyedropperBtn.disabled = !hasImage || isProcessing;
-  elements.toleranceSlider.disabled = !hasImage || isProcessing;
-  elements.resetBtn.disabled = !hasImage || isProcessing;
-  elements.downloadBtn.disabled = !canDownload || isProcessing;
-  elements.loadingSpinner.classList.toggle('hidden', !isProcessing);
-  elements.eyedropperOverlay.classList.toggle('hidden', !isEyedropperActive);
-}
+  // 推入洪泛隊列
+  function enqueue(x, y) {
+    const offset = y * width + x;
+    if (connectedMask[offset] === 0) {
+      connectedMask[offset] = 1;
+      queueX[tail] = x;
+      queueY[tail] = y;
+      tail++;
+    }
+  }
 
-// 檔案驗證
-function validateFile(file) {
-  const errors = [];
-  if (!CONFIG.supportedFormats.includes(file.type)) errors.push('僅支援 PNG、JPEG、WebP。');
-  if (file.size > CONFIG.maxFileSize) errors.push('檔案勿超過10MB。');
-  return errors;
-}
+  // 注入種子：將圖片的四個最外圈邊緣像素全部作為起點注入
+  for (let x = 0; x < width; x++) {
+    if (isBackgroundPixel(x, 0)) enqueue(x, 0);
+    if (isBackgroundPixel(x, height - 1)) enqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    if (isBackgroundPixel(0, y)) enqueue(0, y);
+    if (isBackgroundPixel(width - 1, y)) enqueue(width - 1, y);
+  }
 
-// 載入圖片
-function loadImage(file) {
-  const errs = validateFile(file);
-  if (errs.length) { alert('檔案驗證失敗:\n' + errs.join('\n')); return; }
-  setState(AppState.PROCESSING);
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      if (img.width > CONFIG.maxResolution || img.height > CONFIG.maxResolution) {
-        alert('解析度不可超過4000x4000。');
-        setState(AppState.IDLE); return;
+  // 執行非遞迴的高效率隊列洪泛蔓延
+  const dx = [1, -1, 0, 0];
+  const dy = [0, 0, 1, -1];
+
+  while (head < tail) {
+    const cx = queueX[head];
+    const cy = queueY[head];
+    head++;
+
+    for (let i = 0; i < 4; i++) {
+      const nx = cx + dx[i];
+      const ny = cy + dy[i];
+
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+        if (isBackgroundPixel(nx, ny)) {
+          enqueue(nx, ny);
+        }
       }
-      currentImage = img;
-      setupCanvases(img);
-      setState(AppState.IMAGE_LOADED);
-    };
-    img.onerror = function() {
-      alert('圖片載入失敗');
-      setState(AppState.IDLE);
+    }
+  }
+
+  // --------------------------------------------------------
+  // 第二階段：遮罩融合計算與邊緣補償
+  // --------------------------------------------------------
+  for (let i = 0; i < originalData.length; i += 4) {
+    const pixelOffset = i / 4;
+    
+    // 如果該像素不與外圍背景連通，代表被主體輪廓鎖在內部，100% 豁免去背
+    if (connectedMask[pixelOffset] === 0) {
+      continue; 
+    }
+
+    const r = originalData[i];
+    const g = originalData[i + 1];
+    const b = originalData[i + 2];
+    const a = originalData[i + 3];
+
+    let distance = getPerceptualDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
+    if (isWhiteBg) {
+      const brightness = (r + g + b) / 3;
+      if (brightness > 150) distance += (brightness - 150) * 0.25;
+    }
+
+    // 進行去背渲染
+    if (distance <= tolerance) {
+      resultData[i + 3] = 0;
+    } else if (distance < tolerance + featherZone) {
+      const alphaFactor = (distance - tolerance) / featherZone;
+      const targetAlpha = Math.floor(a * alphaFactor);
+      
+      resultData[i + 3] = targetAlpha;
+
+      if (enableSpillComp && targetAlpha > 0) {
+        const weight = 1 - alphaFactor;
+        resultData[i]     = Math.min(255, Math.max(0, (r - targetColor.r * weight) / alphaFactor));
+        resultData[i + 1] = Math.min(255, Math.max(0, (g - targetColor.g * weight) / alphaFactor));
+        resultData[i + 2] = Math.min(255, Math.max(0, (b - targetColor.b * weight) / alphaFactor));
+      }
+    } else {
+      resultData[i + 3] = a;
+    }
+  }
+
+  return new ImageData(resultData, width, height);
+}
+
+// ============================================================
+// 2. 狀態管理與 DOM 映射層
+// ============================================================
+const AppState = { IDLE: 'idle', LOADED: 'loaded', PROCESSING: 'processing' };
+let currentState = AppState.IDLE;
+let currentImgElement = null;
+let originalImageData = null;
+let targetColor = { r: 255, g: 255, b: 255 };
+let bgPresetMode = 'white'; 
+let isEyedropperActive = false;
+let dragCounter = 0; 
+
+const dom = {
+  fileInput: document.getElementById('fileInput'),
+  dropZone: document.getElementById('dropZone'),
+  dropOverlay: document.getElementById('dropOverlay'),
+  bgSegmented: document.getElementById('bgPresetSegmented'),
+  toleranceSlider: document.getElementById('toleranceSlider'),
+  toleranceValue: document.getElementById('toleranceValue'),
+  featherSlider: document.getElementById('featherSlider'),
+  featherValue: document.getElementById('featherValue'),
+  spillToggle: document.getElementById('spillToggle'),
+  customColorInfo: document.getElementById('customColorInfo'),
+  colorIndicator: document.getElementById('colorIndicator'),
+  colorText: document.getElementById('colorText'),
+  eyedropperBtn: document.getElementById('eyedropperBtn'),
+  downloadBtn: document.getElementById('downloadBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  windowFileName: document.getElementById('windowFileName'),
+  statusMessage: document.getElementById('statusMessage'),
+  originalCanvas: document.getElementById('originalCanvas'),
+  previewCanvas: document.getElementById('previewCanvas'),
+  spinner: document.getElementById('processingSpinner')
+};
+
+const oCtx = dom.originalCanvas.getContext('2d', { willReadFrequently: true });
+const pCtx = dom.previewCanvas.getContext('2d');
+
+function debounce(func, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+function setAppState(state, msg = '') {
+  currentState = state;
+  const isIdle = state === AppState.IDLE;
+  const isProcessing = state === AppState.PROCESSING;
+
+  dom.eyedropperBtn.disabled = isIdle || isProcessing;
+  dom.downloadBtn.disabled = isIdle || isProcessing;
+  dom.resetBtn.disabled = isIdle || isProcessing;
+  dom.toleranceSlider.disabled = isIdle || isProcessing;
+  dom.featherSlider.disabled = isIdle || isProcessing;
+  
+  dom.spinner.classList.toggle('hidden', !isProcessing);
+  if (msg) dom.statusMessage.textContent = msg;
+}
+
+function initCanvasDisplay(img) {
+  const maxDisplayWidth = 620; 
+  const aspect = img.width / img.height;
+  let dw, dh;
+
+  if (img.width > img.height) {
+    dw = Math.min(maxDisplayWidth, img.width);
+    dh = dw / aspect;
+  } else {
+    dh = Math.min(480, img.height);
+    dw = dh * aspect;
+  }
+
+  dom.originalCanvas.width = img.width;
+  dom.originalCanvas.height = img.height;
+  dom.originalCanvas.style.width = `${dw}px`;
+  dom.originalCanvas.style.height = `${dh}px`;
+
+  dom.previewCanvas.width = img.width;
+  dom.previewCanvas.height = img.height;
+  dom.previewCanvas.style.width = `${dw}px`;
+  dom.previewCanvas.style.height = `${dh}px`;
+
+  oCtx.clearRect(0, 0, img.width, img.height);
+  oCtx.drawImage(img, 0, 0);
+  originalImageData = oCtx.getImageData(0, 0, img.width, img.height);
+}
+
+const dispatchExecution = debounce(function() {
+  if (!originalImageData) return;
+  setAppState(AppState.PROCESSING, '正在執行連通域淨化...');
+  
+  setTimeout(() => {
+    const tolerance = parseInt(dom.toleranceSlider.value);
+    const featherZone = parseInt(dom.featherSlider.value);
+    const enableSpillComp = dom.spillToggle.getAttribute('data-on') === 'true';
+
+    const result = removeBackground(originalImageData, targetColor, tolerance, {
+      featherZone,
+      enableSpillComp
+    });
+
+    pCtx.clearRect(0, 0, dom.previewCanvas.width, dom.previewCanvas.height);
+    pCtx.putImageData(result, 0, 0);
+    setAppState(AppState.LOADED, '去背隔離完成');
+  }, 40);
+}, 100);
+
+function handlePresetChange(mode) {
+  bgPresetMode = mode;
+  
+  Array.from(dom.bgSegmented.children).forEach(btn => {
+    btn.setAttribute('data-active', btn.getAttribute('data-value') === mode ? 'true' : 'false');
+  });
+
+  if (mode === 'white') {
+    targetColor = { r: 255, g: 255, b: 255 };
+    dom.customColorInfo.style.opacity = '0.5';
+    dom.toleranceSlider.value = 35;
+    dom.featherSlider.value = 25;
+  } else if (mode === 'black') {
+    targetColor = { r: 0, g: 0, b: 0 };
+    dom.customColorInfo.style.opacity = '0.5';
+    dom.toleranceSlider.value = 25;
+    dom.featherSlider.value = 15;
+  } else {
+    dom.customColorInfo.style.opacity = '1';
+  }
+  
+  dom.toleranceValue.textContent = dom.toleranceSlider.value;
+  dom.featherValue.textContent = dom.featherSlider.value;
+  updateColorPreviewUI();
+  dispatchExecution();
+}
+
+function updateColorPreviewUI() {
+  const rgbStr = `rgb(${targetColor.r},${targetColor.g},${targetColor.b})`;
+  dom.colorIndicator.style.background = rgbStr;
+  dom.colorText.textContent = `RGB(${targetColor.r},${targetColor.g},${targetColor.b})`;
+}
+
+function handleFileImport(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  
+  setAppState(AppState.PROCESSING, '解析並建立影像拓撲...');
+  dom.windowFileName.textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      currentImgElement = img;
+      initCanvasDisplay(img);
+      handlePresetChange(bgPresetMode); 
     };
     img.src = e.target.result;
-  };
-  reader.onerror = function() {
-    alert('檔案讀取失敗');
-    setState(AppState.IDLE);
   };
   reader.readAsDataURL(file);
 }
 
-function setupCanvases(img) {
-  // 計算顯示尺寸
-  const maxW = 400, maxH = 400;
-  const aspect = img.width / img.height;
-  let dw, dh;
-  if (img.width > img.height) {
-    dw = Math.min(maxW, img.width);
-    dh = dw / aspect;
-  } else {
-    dh = Math.min(maxH, img.height);
-    dw = dh * aspect;
-  }
-  // 原圖canvas
-  originalCanvas.width = img.width;
-  originalCanvas.height = img.height;
-  originalCanvas.style.width = dw + 'px';
-  originalCanvas.style.height = dh + 'px';
-  originalCtx.clearRect(0, 0, img.width, img.height);
-  originalCtx.drawImage(img, 0, 0);
-  originalImageData = originalCtx.getImageData(0, 0, img.width, img.height);
-  // 預覽canvas
-  previewCanvas.width = img.width;
-  previewCanvas.height = img.height;
-  previewCanvas.style.width = dw + 'px';
-  previewCanvas.style.height = dh + 'px';
-  previewCtx.clearRect(0, 0, img.width, img.height);
-  previewCtx.drawImage(img, 0, 0);
-}
-
-// 去背流程（debounce）
-const processBackgroundRemoval = debounce(function() {
-  if (!originalImageData || currentState === AppState.PROCESSING) return;
-  setState(AppState.PROCESSING);
-  setTimeout(() => {
-    try {
-      const resultData = removeBackground(originalImageData, targetColor, tolerance);
-      previewCtx.putImageData(resultData, 0, 0);
-      setState(AppState.DONE);
-    } catch (err) {
-      alert('去背失敗');
-      setState(AppState.IMAGE_LOADED);
-    }
-  }, 50);
-}, CONFIG.debounceDelay);
-
-// 滴管功能
-function handleCanvasClick(event) {
+function handleCanvasIntersection(e) {
   if (!isEyedropperActive || !originalImageData) return;
-  const rect = originalCanvas.getBoundingClientRect();
-  const scaleX = originalCanvas.width / rect.width;
-  const scaleY = originalCanvas.height / rect.height;
-  const x = Math.floor((event.clientX - rect.left) * scaleX);
-  const y = Math.floor((event.clientY - rect.top) * scaleY);
-  const clampedX = Math.max(0, Math.min(x, originalCanvas.width - 1));
-  const clampedY = Math.max(0, Math.min(y, originalCanvas.height - 1));
-  const idx = (clampedY * originalCanvas.width + clampedX) * 4;
-  const imgData = originalImageData.data;
-  targetColor = { r: imgData[idx], g: imgData[idx + 1], b: imgData[idx + 2] };
-  updateColorDisplay();
+
+  const rect = dom.originalCanvas.getBoundingClientRect();
+  const scaleX = dom.originalCanvas.width / rect.width;
+  const scaleY = dom.originalCanvas.height / rect.height;
+
+  const x = Math.floor((e.clientX - rect.left) * scaleX);
+  const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+  const targetX = Math.max(0, Math.min(x, dom.originalCanvas.width - 1));
+  const targetY = Math.max(0, Math.min(y, dom.originalCanvas.height - 1));
+
+  const pixelIdx = (targetY * dom.originalCanvas.width + targetX) * 4;
+  const rawData = originalImageData.data;
+
+  targetColor = {
+    r: rawData[pixelIdx],
+    g: rawData[pixelIdx + 1],
+    b: rawData[pixelIdx + 2]
+  };
+
+  updateColorPreviewUI();
   deactivateEyedropper();
-  processBackgroundRemoval();
+  handlePresetChange('custom');
 }
 
-// 顏色顯示
-function updateColorDisplay() {
-  const rgb = `rgb(${targetColor.r},${targetColor.g},${targetColor.b})`;
-  elements.selectedColorDisplay.style.backgroundColor = rgb;
-  elements.selectedColorText.textContent = `RGB(${targetColor.r},${targetColor.g},${targetColor.b})`;
-  elements.selectedColorDisplay.setAttribute('aria-label', `選中顏色：${rgb}`);
-}
-
-// 滴管啟用/停用
 function activateEyedropper() {
   isEyedropperActive = true;
-  elements.eyedropperBtn.innerHTML = '❌取消滴管';
-  elements.eyedropperBtn.setAttribute('aria-label', '取消滴管工具');
-  originalCanvas.style.cursor = 'crosshair';
-  updateUI();
+  dom.eyedropperBtn.style.outline = "2px solid var(--al-accent)";
+  dom.eyedropperBtn.textContent = '❌ 請在左圖點選背景色';
+  dom.originalCanvas.style.cursor = 'crosshair';
 }
+
 function deactivateEyedropper() {
   isEyedropperActive = false;
-  elements.eyedropperBtn.innerHTML = '🎨滴管工具';
-  elements.eyedropperBtn.setAttribute('aria-label', '啟用滴管工具選擇目標顏色');
-  originalCanvas.style.cursor = 'default';
-  updateUI();
+  dom.eyedropperBtn.style.outline = "none";
+  dom.eyedropperBtn.textContent = '🎨 色彩吸管';
+  dom.originalCanvas.style.cursor = 'default';
 }
 
-// 重置功能
-function resetSettings() {
-  targetColor = { r: 255, g: 255, b: 255 };
-  tolerance = CONFIG.defaultTolerance;
-  elements.toleranceSlider.value = tolerance;
-  elements.toleranceValue.textContent = tolerance;
-  updateColorDisplay();
-  if (currentImage && originalImageData) {
-    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    previewCtx.drawImage(currentImage, 0, 0);
-    setState(AppState.IMAGE_LOADED);
-  }
-  if (isEyedropperActive) deactivateEyedropper();
-}
+function initListeners() {
+  dom.dropZone.addEventListener('click', () => dom.fileInput.click());
+  dom.fileInput.addEventListener('change', (e) => handleFileImport(e.target.files[0]));
 
-// 下載圖片
-function downloadImage() {
-  if (!previewCanvas) return;
-  previewCanvas.toBlob(function(blob) {
-    if (!blob) { alert('圖片生成失敗'); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `removed-background-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 'image/png');
-}
-
-// 拖曳事件
-function handleDragOver(event) {
-  event.preventDefault(); event.stopPropagation();
-  elements.dropZone.classList.add('drag-over');
-}
-function handleDragLeave(event) {
-  event.preventDefault(); event.stopPropagation();
-  elements.dropZone.classList.remove('drag-over');
-}
-function handleDrop(event) {
-  event.preventDefault(); event.stopPropagation();
-  elements.dropZone.classList.remove('drag-over');
-  const files = Array.from(event.dataTransfer.files);
-  const imgFile = files.find(f => f.type.startsWith('image/'));
-  if (imgFile) loadImage(imgFile); else alert('請拖曳圖片檔案');
-}
-
-// 初始化
-function initializeElements() {
-  elements = {
-    fileInput: document.getElementById('fileInput'),
-    dropZone: document.getElementById('dropZone'),
-    previewSection: document.getElementById('previewSection'),
-    controlsSection: document.getElementById('controlsSection'),
-    originalCanvas: document.getElementById('originalCanvas'),
-    previewCanvas: document.getElementById('previewCanvas'),
-    eyedropperBtn: document.getElementById('eyedropperBtn'),
-    eyedropperOverlay: document.getElementById('eyedropperOverlay'),
-    toleranceSlider: document.getElementById('toleranceSlider'),
-    toleranceValue: document.getElementById('toleranceValue'),
-    selectedColorDisplay: document.getElementById('selectedColorDisplay'),
-    selectedColorText: document.getElementById('selectedColorText'),
-    resetBtn: document.getElementById('resetBtn'),
-    downloadBtn: document.getElementById('downloadBtn'),
-    loadingSpinner: document.getElementById('loadingSpinner'),
-    statusText: document.getElementById('statusText')
-  };
-  originalCanvas = elements.originalCanvas;
-  previewCanvas = elements.previewCanvas;
-  if (originalCanvas && previewCanvas) {
-    originalCtx = originalCanvas.getContext('2d');
-    previewCtx = previewCanvas.getContext('2d');
-  } else {
-    alert('找不到 canvas 元件');
-  }
-}
-
-function initializeEventListeners() {
-  elements.fileInput.addEventListener('change', function(e) {
-    const file = e.target.files[0]; if (file) loadImage(file);
+  window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    dom.dropOverlay.classList.remove('hidden');
   });
-  elements.dropZone.addEventListener('dragover', handleDragOver);
-  elements.dropZone.addEventListener('dragleave', handleDragLeave);
-  elements.dropZone.addEventListener('drop', handleDrop);
-  elements.dropZone.addEventListener('click', function() {
-    elements.fileInput.click();
+
+  window.addEventListener('dragover', (e) => e.preventDefault());
+
+  window.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter === 0) dom.dropOverlay.classList.add('hidden');
   });
-  elements.dropZone.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault(); elements.fileInput.click();
+
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dom.dropOverlay.classList.add('hidden');
+    if (e.dataTransfer.files.length > 0) handleFileImport(e.dataTransfer.files[0]);
+  });
+
+  dom.bgSegmented.addEventListener('click', (e) => {
+    const btn = e.target.closest('.al-segmented-item');
+    if (btn) handlePresetChange(btn.getAttribute('data-value'));
+  });
+
+  dom.toleranceSlider.addEventListener('input', function() {
+    dom.toleranceValue.textContent = this.value;
+    dispatchExecution();
+  });
+  
+  dom.featherSlider.addEventListener('input', function() {
+    dom.featherValue.textContent = this.value;
+    dispatchExecution();
+  });
+
+  dom.spillToggle.addEventListener('click', function() {
+    const isOn = this.getAttribute('data-on') === 'true';
+    this.setAttribute('data-on', isOn ? 'false' : 'true');
+    dispatchExecution();
+  });
+
+  dom.eyedropperBtn.addEventListener('click', () => {
+    if (isEyedropperActive) deactivateEyedropper(); else activateEyedropper();
+  });
+  
+  dom.originalCanvas.addEventListener('mousedown', handleCanvasIntersection);
+
+  dom.downloadBtn.addEventListener('click', () => {
+    if (!dom.previewCanvas) return;
+    dom.previewCanvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `purged_${Date.now()}.png`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
+  dom.resetBtn.addEventListener('click', () => {
+    if (currentImgElement) {
+      initCanvasDisplay(currentImgElement);
+      handlePresetChange(bgPresetMode);
     }
   });
-  if (originalCanvas) {
-    originalCanvas.addEventListener('click', handleCanvasClick);
-  }
-  if (elements.eyedropperBtn) {
-    elements.eyedropperBtn.addEventListener('click', function() {
-      if (isEyedropperActive) deactivateEyedropper();
-      else activateEyedropper();
-    });
-  }
-  if (elements.toleranceSlider) {
-    elements.toleranceSlider.addEventListener('input', function() {
-      tolerance = parseInt(this.value);
-      elements.toleranceValue.textContent = tolerance;
-      processBackgroundRemoval();
-    });
-  }
-  if (elements.resetBtn) {
-    elements.resetBtn.addEventListener('click', resetSettings);
-  }
-  if (elements.downloadBtn) {
-    elements.downloadBtn.addEventListener('click', downloadImage);
-  }
 }
 
-// DOM 完成初始化
-document.addEventListener('DOMContentLoaded', function() {
-  initializeElements();
-  initializeEventListeners();
-  updateColorDisplay();
-  setState(AppState.IDLE);
-  if (!window.FileReader || !document.createElement('canvas').getContext) {
-    alert('此瀏覽器不支援所有功能，請升級。');
-  }
+document.addEventListener('DOMContentLoaded', () => {
+  initListeners();
+  setAppState(AppState.IDLE, '等待匯入產品圖檔...');
 });

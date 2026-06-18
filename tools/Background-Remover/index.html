@@ -3,60 +3,212 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>純色去背小工具 V2.0</title>
-  <link rel="stylesheet" href="style.css">
+  <title>產品與維基插圖去背淨化器 Pro</title>
+  <link rel="stylesheet" href="archlens-theme.css">
+  <style>
+    body { margin: 0; padding: 32px 24px; display: flex; justify-content: center; background: var(--al-bg); }
+    .app-container { max-width: 1400px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+    
+    /* 頂部強固型控制台：改用 Grid 分艙佈局，徹底防止元件擠壓 */
+    .dashboard-panel {
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      gap: 32px;
+      align-items: center;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      padding: 24px;
+    }
+    @media (max-width: 1100px) {
+      .dashboard-panel { grid-template-columns: 1fr; gap: 20px; }
+    }
+
+    /* 控制艙基底 */
+    .control-pod {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      justify-content: center;
+    }
+    .control-pod--sliders {
+      border-left: 1px solid var(--al-border);
+      border-right: 1px solid var(--al-border);
+      padding: 0 32px;
+    }
+    @media (max-width: 1100px) {
+      .control-pod--sliders { border: none; padding: 16px 0; border-top: 1px solid var(--al-border); border-bottom: 1px solid var(--al-border); }
+    }
+
+    /* 提高關鍵標籤的視覺強度 */
+    .pod-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--al-ink);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--al-slate-700);
+    }
+    .slider-title { font-weight: 600; }
+    
+    /* 檔案載入器 */
+    .compact-upload {
+      border: 2px dashed var(--al-border);
+      padding: 16px;
+      text-align: center;
+      border-radius: var(--al-radius-md);
+      cursor: pointer;
+      background: var(--al-bg-alt);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .compact-upload:hover { border-color: var(--al-accent); background: var(--al-accent-soft); }
+
+    /* 下方工作區 */
+    .workspace-window { padding: 0; overflow: hidden; position: relative; width: 100%; }
+    .canvas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px; }
+    @media (max-width: 768px) { .canvas-grid { grid-template-columns: 1fr; } }
+    
+    .canvas-wrapper { 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      gap: 12px; 
+      position: relative; 
+      background: #EBEAE4; /* 稍微加深畫布底色，突顯白底產品 */
+      border-radius: var(--al-radius-md);
+      padding: 20px;
+    }
+    
+    canvas { 
+      max-width: 100%; 
+      height: auto; 
+      display: block; 
+      border-radius: var(--al-radius-sm);
+      box-shadow: var(--al-shadow-card);
+      background-size: 20px 20px; 
+      background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); 
+    }
+
+    .hidden { display: none !important; }
+    .al-drop-overlay { pointer-events: none; }
+    
+    /* 動作按鈕列 layout */
+    .action-bar { display: flex; gap: 8px; width: 100%; }
+    .action-bar button { flex: 1; justify-content: center; }
+  </style>
 </head>
-<body>
-  <div class="container">
-    <header class="app-header">
-      <h1>純色去背小工具 V2.0</h1>
-      <p class="subtitle">選擇圖片並使用滴管工具，點擊要去背的背景顏色！</p>
+<body class="al-root">
+
+  <div class="app-container">
+    <header style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <span class="al-badge al-badge--live">Connected Flood Isolation</span>
+        <h1 class="al-display" style="font-size: 28px; margin: 4px 0 0 0;">產品與維基插圖去背淨化器</h1>
+      </div>
+      <div class="al-mono" id="statusMessage" style="font-size: 12px; color: var(--al-slate-500);">Awaiting input asset...</div>
     </header>
-    <div class="warning-section card">
-      <h3>限制</h3>
-      <p>圖片最大 10MB、最高解析度 4000×4000，僅支援 PNG/JPEG/WebP。</p>
-    </div>
-    <div class="upload-section card">
-      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" aria-label="選擇圖片">
-      <div id="dropZone" class="drop-zone" tabindex="0" aria-label="拖曳圖片進行上傳">
-        <div class="drop-zone-content">
-          <p class="drop-text">將圖片拖曳到這裡或<span class="browse-link">點此選擇</span></p>
-          <p class="format-info">支援: PNG、JPEG、WebP</p>
+
+    <section class="dashboard-panel">
+      
+      <div class="control-pod">
+        <div id="dropZone" class="compact-upload">
+          <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" style="display: none;">
+          <span>📥 拖曳或<span style="color: var(--al-accent); font-weight: 700;">選取產品圖片</span></span>
+        </div>
+        <div class="al-segmented" id="bgPresetSegmented" style="width: 100%;">
+          <button class="al-segmented-item" data-value="white" data-active="true" style="flex: 1;">優化白底</button>
+          <button class="al-segmented-item" data-value="black" style="flex: 1;">優化黑底</button>
+          <button class="al-segmented-item" data-value="custom" style="flex: 1;">自訂吸管</button>
         </div>
       </div>
-    </div>
-    <div id="previewSection" class="preview-section hidden">
-      <div class="preview-container">
-        <div class="original-preview">
-          <h3>原始圖片</h3>
-          <div class="canvas-container">
-            <canvas id="originalCanvas"></canvas>
-            <div id="eyedropperOverlay" class="eyedropper-overlay hidden"></div>
+
+      <div class="control-pod control-pod--sliders">
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-title">基礎去背容差 (背景擴展門檻)</span>
+            <span class="al-mono" id="toleranceValue" style="color: var(--al-accent); font-weight: 700; font-size: 14px;">30</span>
           </div>
-          <div class="selected-color-preview">
-            <span id="selectedColorDisplay"></span>
-            <span id="selectedColorText"></span>
+          <input type="range" id="toleranceSlider" min="1" max="150" value="30">
+        </div>
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-title">邊緣羽化範圍 (平滑淡出過渡)</span>
+            <span class="al-mono" id="featherValue" style="color: var(--al-accent); font-weight: 700; font-size: 14px;">20</span>
+          </div>
+          <input type="range" id="featherSlider" min="0" max="50" value="20">
+        </div>
+      </div>
+
+      <div class="control-pod">
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--al-bg-alt); padding: 8px 12px; border-radius: var(--al-radius-md);">
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 12px; font-weight: 700;">智慧溢色補償開關</span>
+            <span style="font-size: 11px; color: var(--al-slate-500);">逆向消除半透明環境光白邊</span>
+          </div>
+          <button class="al-toggle" id="spillToggle" data-on="true">
+            <span class="al-toggle-knob"></span>
+          </button>
+        </div>
+
+        <div class="action-bar">
+          <button class="al-btn al-btn--toolbar al-btn--secondary" id="eyedropperBtn" disabled>🎨 色彩吸管</button>
+          <div id="customColorInfo" style="display: flex; align-items: center; gap: 6px; opacity: 0.5; padding: 0 4px;">
+            <span id="colorIndicator" style="width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--al-border); background: #FFF;"></span>
+            <span class="al-mono" id="colorText" style="font-size: 11px;">RGB(255,255,255)</span>
           </div>
         </div>
-        <div class="result-preview">
-          <h3>去背結果預覽</h3>
+
+        <div class="action-bar">
+          <button class="al-btn al-btn--toolbar al-btn--secondary" id="resetBtn" disabled>重置</button>
+          <button class="al-btn al-btn--toolbar al-btn--primary" id="downloadBtn" disabled>保存透明 PNG</button>
+        </div>
+      </div>
+
+    </section>
+
+    <main class="al-card al-card--float workspace-window">
+      <div id="dropOverlay" class="al-drop-overlay hidden">
+        <div class="al-mono" style="color: var(--al-accent); font-weight: 600; font-size: 16px; background: rgba(255,255,255,0.95); padding: 20px 40px; border-radius: var(--al-radius-md); box-shadow: var(--al-shadow-float);">
+          📥 釋放滑鼠，即刻載入影像資產
+        </div>
+      </div>
+
+      <div class="al-window-bar">
+        <span class="al-window-dot al-window-dot--red"></span>
+        <span class="al-window-dot al-window-dot--yellow"></span>
+        <span class="al-window-dot al-window-dot--green"></span>
+        <span class="al-window-filename" id="windowFileName">output_isolated.png</span>
+        <span class="al-spinner hidden" id="processingSpinner" style="margin-left: 12px;"></span>
+      </div>
+
+      <div class="canvas-grid">
+        <div class="canvas-wrapper">
+          <span class="al-card-eyebrow">原始影像（點擊啟用色彩吸管）</span>
+          <canvas id="originalCanvas"></canvas>
+        </div>
+        <div class="canvas-wrapper">
+          <span class="al-card-eyebrow" style="color: var(--al-accent);">淨化後純淨結果</span>
           <canvas id="previewCanvas"></canvas>
         </div>
       </div>
-    </div>
-    <div id="controlsSection" class="controls-section hidden">
-      <button id="eyedropperBtn" aria-label="啟用滴管工具選擇背景色">🎨滴管工具</button>
-      <label>
-        容差值
-        <input type="range" id="toleranceSlider" min="1" max="100" value="30">
-        <span id="toleranceValue">30</span>
-      </label>
-      <button id="resetBtn">重置</button>
-      <button id="downloadBtn" disabled>下載去背圖片</button>
-    </div>
-    <div id="loadingSpinner" class="loading-spinner hidden"></div>
-    <div id="statusText" class="status-text"></div>
+    </main>
+
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
