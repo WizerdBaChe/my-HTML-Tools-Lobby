@@ -13,7 +13,21 @@
 		"isNew": false,
 		"order": 1,
 		"updatedAt": "2026-06-13"
-	},
+	},{
+		"id": "File_DiffLens",
+		"name": "文字比對工具",
+		"name_en": "File diffrence preview",
+		"description": "上傳兩組檔案結構，直觀比較其差異",
+		"path": "./tools/File_DiffLens/",
+		"category": "developer",
+		"tags": [ "preview","web","file-processer","text"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 2,
+		"updatedAt": "2026-06-17"
+    }
     {
 		"id": "IG-Image-Filler",
 		"name": "IG 圖片填充器",
@@ -26,7 +40,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": false,
-		"order": 2,
+		"order": 3,
 		"updatedAt": "2026-06-11"
     },
     {
@@ -41,22 +55,22 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 3,
+		"order": 4,
 		"updatedAt": "2026-06-16"
     },
 	{
-		"id": "DiffLens",
+		"id": "text_DiffLens",
 		"name": "文字比對工具",
 		"name_en": "Text diffrence preview",
 		"description": "貼上文字或上傳各類型純文字檔(包含md,py,json...)，即時比較前後差異。",
-		"path": "./tools/DiffLens/",
+		"path": "./tools/text_DiffLens/",
 		"category": "developer",
 		"tags": [ "preview","web","file-processer","text"],
 		"supportsIframe": true,
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 4,
+		"order": 5,
 		"updatedAt": "2026-06-17"
     },
     {
@@ -71,7 +85,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 5,
+		"order": 6,
 		"updatedAt": "2026-06-11"
     },
     {
@@ -86,7 +100,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 6,
+		"order": 7,
 		"updatedAt": "2026-06-11"
 	},
 	{
@@ -101,7 +115,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 7,
+		"order": 8,
 		"updatedAt": "2026-06-18"
     }
 ]
