@@ -16,9 +16,9 @@
 	},
 	{
 		"id": "File_DiffLens",
-		"name": "文字比對工具",
+		"name": "檔案夾對比工具",
 		"name_en": "File diffrence preview",
-		"description": "上傳兩組檔案結構，直觀比較其差異",
+		"description": "上傳兩組檔案結構，搞清楚結構怎麼變化的",
 		"path": "./tools/File_DiffLens/",
 		"category": "developer",
 		"tags": [ "preview","web","file-processer","text"],
