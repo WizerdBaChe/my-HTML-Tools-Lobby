@@ -13,7 +13,8 @@
 		"isNew": false,
 		"order": 1,
 		"updatedAt": "2026-06-13"
-	},{
+	},
+	{
 		"id": "File_DiffLens",
 		"name": "文字比對工具",
 		"name_en": "File diffrence preview",
@@ -27,7 +28,7 @@
 		"isNew": true,
 		"order": 2,
 		"updatedAt": "2026-06-17"
-    }
+    },
     {
 		"id": "IG-Image-Filler",
 		"name": "IG 圖片填充器",
