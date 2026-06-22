@@ -1,12 +1,12 @@
 [
 	{
-		"id": "archlens",
+		"id": "ArchLens-Web",
 		"name": "檔案結構快速產生器",
-		"name_en": "ArchLens Web",
+		"name_en": "ArchLens-Web",
 		"description": "專案目錄結構掃描與視覺化工具，支援多主題切換。",
-		"path": "https://wizerdbache.github.io/ArchLens_Web/",
+		"path": "https://wizerdbache.github.io/ArchLens-Web/",
 		"category": "developer",
-		"tags": ["architecture", "tree", "visualizer", "react"],
+		"tags": ["ArchLens","architecture", "tree", "visualizer", "react","develope","AI-Cowork"],
 		"supportsIframe": false,
 		"status": "ready",
 		"featured": true,
@@ -15,25 +15,40 @@
 		"updatedAt": "2026-06-13"
 	},
 	{
-		"id": "File_DiffLens",
+		"id": "ArchLens-DiffTeller/",
 		"name": "檔案夾對比工具",
-		"name_en": "File diffrence preview",
+		"name_en": "ArchLens-DiffTeller/",
 		"description": "上傳兩組檔案結構，搞清楚結構怎麼變化的",
 		"path": "https://wizerdbache.github.io/ArchLens-DiffTeller/",
 		"category": "developer",
-		"tags": [ "preview","file-processer","architecture", "tree", "visualizer", "react"],
+		"tags": [ "ArchLens","preview","file-processer","architecture", "tree", "visualizer", "react","AI-Cowork"],
 		"supportsIframe": false,
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
 		"order": 2,
-		"updatedAt": "2026-06-17"
+		"updatedAt": "2026-06-21"
+    },
+	{
+		"id": "ArchLens-DependencyTeller",
+		"name": "檔案相依檢查工具",
+		"name_en": "ArchLens-DependencyTeller",
+		"description": "上傳兩組檔案結構，搞清楚結構怎麼變化的",
+		"path": "https://wizerdbache.github.io/ArchLens-DependencyTeller/",
+		"category": "developer",
+		"tags": [ "ArchLens","preview","file-processer","architecture","node","develope","visualizer","AI-Cowork"],
+		"supportsIframe": false,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 3,
+		"updatedAt": "2026-06-22"
     },
     {
 		"id": "IG-Image-Filler",
-		"name": "IG 圖片填充器",
+		"name": "IG圖片背景填充器",
 		"name_en": "IG-Image-Filler",
-		"description": "快速產生符合 Instagram 比例的佔位圖片，方便排版測試與預覽。",
+		"description": "批量將圖片背景填白，成為符合IG上傳的方形比例圖片。",
 		"path": "./tools/IG-Image-Filler/",
 		"category": "image",
 		"tags": ["instagram", "image", "placeholder"],
@@ -41,7 +56,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": false,
-		"order": 3,
+		"order": 4,
 		"updatedAt": "2026-06-11"
     },
     {
@@ -56,7 +71,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 4,
+		"order": 5,
 		"updatedAt": "2026-06-16"
     },
 	{
@@ -71,7 +86,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 5,
+		"order": 6,
 		"updatedAt": "2026-06-17"
     },
     {
@@ -86,7 +101,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 6,
+		"order": 7,
 		"updatedAt": "2026-06-11"
     },
     {
@@ -101,7 +116,7 @@
 		"status": "ready",
 		"featured": false,
 		"isNew": false,
-		"order": 7,
+		"order": 8,
 		"updatedAt": "2026-06-11"
 	},
 	{
@@ -116,7 +131,7 @@
 		"status": "ready",
 		"featured": true,
 		"isNew": true,
-		"order": 8,
+		"order": 9,
 		"updatedAt": "2026-06-18"
     }
 ]

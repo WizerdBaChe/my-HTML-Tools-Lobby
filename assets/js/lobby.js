@@ -12,7 +12,7 @@ const state = {
   sort: 'order',
 };
 
-/* ── Category icon map ──────────────────────────────────────── */
+/* ── Category icon map (SVG strings) ───────────────────────── */
 const CATEGORY_ICONS = {
   utility:      '🔧',
   developer:    '💻',
@@ -21,6 +21,28 @@ const CATEGORY_ICONS = {
   image:        '🖼️',
   experimental: '🧪',
   default:      '⚙️',
+};
+
+/* SVG icons per category for filter buttons */
+const CATEGORY_SVG = {
+  all:          `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>`,
+  developer:    `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 4 1 8 5 12"/><polyline points="11 4 15 8 11 12"/><line x1="9" y1="2" x2="7" y2="14"/></svg>`,
+  image:        `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1" width="14" height="14" rx="2"/><circle cx="5.5" cy="5.5" r="1.5"/><polyline points="16 10 11 5 2 14"/></svg>`,
+  text:         `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="11" y2="8"/><line x1="2" y1="12" x2="8" y2="12"/></svg>`,
+  data:         `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="14" x2="8" y2="6"/><line x1="3" y1="14" x2="3" y2="10"/><line x1="13" y1="14" x2="13" y2="2"/></svg>`,
+  utility:      `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v2m0 10v2M1 8h2m10 0h2m-3.05-4.95-1.41 1.41M4.46 11.54l-1.41 1.41m0-9.9 1.41 1.41m7.08 7.08 1.41 1.41"/></svg>`,
+  experimental: `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v5L2 13a1 1 0 0 0 .9 1.5h10.2A1 1 0 0 0 14 13L10 7V2"/><line x1="5" y1="2" x2="11" y2="2"/></svg>`,
+};
+
+/* Chinese display labels per category */
+const CATEGORY_LABELS = {
+  all:          '全部',
+  developer:    '開發',
+  image:        '圖像',
+  text:         '文字',
+  data:         '數據',
+  utility:      '工具',
+  experimental: '實驗',
 };
 
 /* ── Status → badge class map ───────────────────────────────── */
@@ -226,13 +248,16 @@ function buildCategoryFilters() {
   const container  = document.getElementById('filter-group');
   if (!container) return;
 
-  container.innerHTML = categories.map(cat => `
-    <button class="filter-btn${cat === 'all' ? ' is-active' : ''}"
+  container.innerHTML = categories.map(cat => {
+    const icon  = CATEGORY_SVG[cat] || '';
+    const label = CATEGORY_LABELS[cat] || cat;
+    return `<button class="filter-btn${cat === 'all' ? ' is-active' : ''}"
             data-category="${escAttr(cat)}"
-            aria-pressed="${cat === 'all' ? 'true' : 'false'}">
-      ${cat === 'all' ? '全部' : cat}
-    </button>
-  `).join('');
+            aria-pressed="${cat === 'all' ? 'true' : 'false'}"
+            aria-label="${cat === 'all' ? '顯示全部工具' : `篩選分類：${label}`}">
+      ${icon}<span>${label}</span>
+    </button>`;
+  }).join('');
 
   container.querySelectorAll('[data-category]').forEach(btn => {
     btn.addEventListener('click', () => setCategory(btn.dataset.category));
