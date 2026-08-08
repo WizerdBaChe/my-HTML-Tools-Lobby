@@ -133,5 +133,20 @@
 		"isNew": true,
 		"order": 9,
 		"updatedAt": "2026-06-18"
+    },
+    {
+		"id": "png2svg",
+		"name": "圖片轉 SVG 向量化工具",
+		"name_en": "PNG/JPG to SVG",
+		"description": "把 PNG / JPG 圖片轉成可無限放大的 SVG 向量圖，自動判斷圖型選用合適引擎，所有運算都在瀏覽器完成。",
+		"path": "./tools/png2svg/",
+		"category": "image",
+		"tags": ["svg","image","vector","converter","photo"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 10,
+		"updatedAt": "2026-08-08"
     }
 ]
