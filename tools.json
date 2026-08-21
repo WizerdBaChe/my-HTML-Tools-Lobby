@@ -148,5 +148,20 @@
 		"isNew": true,
 		"order": 10,
 		"updatedAt": "2026-08-08"
+    },
+	{
+		"id": "Ladder-Lottery",
+		"name": "帶限制爬梯子",
+		"name_en": "Ladder-Lottery",
+		"description": "可在有時段限制的狀況下進行爬梯，避開個別不可能的時段",
+		"path": "./tools/Ladder-Lottery/",
+		"category": "entertainment",
+		"tags": ["entertainment","life","time","friend","decision"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 11,
+		"updatedAt": "2026-08-21"
     }
 ]

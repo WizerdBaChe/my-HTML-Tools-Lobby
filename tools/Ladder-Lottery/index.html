@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>爬梯子分配</title>
+<style>
+  :root{
+    --ink:#1F3B2C;
+    --bamboo:#D9B45C;
+    --paper:#F6F1E4;
+    --paper-2:#EFE8D6;
+    --warn:#B8452F;
+    --line:#DDD4BE;
+    --line-strong:#B9AE8E;
+    --text:#2A2A22;
+    --text-soft:#6B6553;
+    --white:#FFFDF8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:"SF Mono",Consolas,Menlo,monospace;
+    font-size:12px;
+    letter-spacing:0.28em;
+    color:var(--ink);
+    opacity:0.65;
+    text-transform:uppercase;
+  }
+  h1{
+    font-size:clamp(26px,3.4vw,38px);
+    margin:6px 0 8px;
+    letter-spacing:0.04em;
+    color:var(--ink);
+    font-weight:800;
+    outline:none;
+    border-radius:6px;
+    padding:2px 4px;
+    margin-left:-4px;
+  }
+  h1:hover, h1:focus{
+    background:var(--paper-2);
+  }
+  h1[contenteditable="true"]:empty::before{
+    content:"點此輸入標題";
+    color:var(--text-soft);
+  }
+  .title-hint{
+    font-size:11.5px;
+    color:var(--text-soft);
+    margin-top:-4px;
+    margin-bottom:10px;
+  }
+  .sub{
+    color:var(--text-soft);
+    font-size:14.5px;
+    line-height:1.7;
+    max-width:640px;
+  }
+
+  .panel{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px;
+    margin-bottom:22px;
+  }
+  .panel h2{
+    font-size:15px;
+    letter-spacing:0.06em;
+    margin:0 0 14px;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel h2 .tag{
+    font-family:"SF Mono",Consolas,Menlo,monospace;
+    font-size:11px;
+    background:var(--paper-2);
+    border:1px solid var(--line);
+    border-radius:5px;
+    padding:2px 7px;
+    color:var(--text-soft);
+    letter-spacing:0.02em;
+  }
+
+  /* ---------- 名單管理 ---------- */
+  .manage-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
+  @media(max-width:720px){ .manage-grid{grid-template-columns:1fr;} }
+  .manage-col label.col-title{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink);
+    letter-spacing:0.04em;
+    display:block;
+    margin-bottom:8px;
+  }
+  .chip-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:12px;
+    min-height:34px;
+  }
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--paper-2);
+    border:1px solid var(--line-strong);
+    border-radius:20px;
+    padding:6px 8px 6px 14px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .chip .del{
+    cursor:pointer;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    line-height:1;
+    user-select:none;
+  }
+  .chip .del:hover{opacity:0.75;}
+  .add-row{
+    display:flex;
+    gap:8px;
+  }
+  .add-row input{
+    flex:1;
+    font-family:inherit;
+    font-size:13.5px;
+    padding:9px 12px;
+    border:1.5px solid var(--line-strong);
+    border-radius:8px;
+    background:var(--white);
+    color:var(--text);
+    outline:none;
+  }
+  .add-row input:focus{border-color:var(--ink);}
+  .add-row button{
+    padding:9px 16px;
+    font-size:13px;
+  }
+  .empty-note{
+    font-size:12.5px;
+    color:var(--text-soft);
+    padding:6px 0;
+  }
+
+  /* ---------- 表格 ---------- */
+  .table-scroll{overflow-x:auto;}
+  table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:480px;
+    font-size:14px;
+  }
+  th,td{
+    border:1px solid var(--line);
+    padding:0;
+    text-align:center;
+    height:42px;
+  }
+  th{
+    background:var(--paper-2);
+    color:var(--ink);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.03em;
+    padding:9px 6px;
+    white-space:nowrap;
+  }
+  th.corner{
+    font-size:12px;
+    color:var(--text-soft);
+    font-weight:600;
+  }
+  td.name-cell{
+    text-align:left;
+    padding:0 12px;
+    font-weight:700;
+    color:var(--ink);
+    background:var(--paper-2);
+    white-space:nowrap;
+  }
+  td.cell{
+    cursor:pointer;
+    position:relative;
+    user-select:none;
+    transition:background .12s ease;
+  }
+  td.cell:hover{background:#efe4c9;}
+  td.cell.blocked{
+    background:var(--ink);
+  }
+  td.cell.blocked::after{
+    content:"✕";
+    color:var(--bamboo);
+    font-size:13px;
+    font-weight:700;
+  }
+  td.cell.result{
+    background:var(--bamboo);
+  }
+  td.cell.result::after{
+    content:"●";
+    color:var(--ink);
+    font-size:11px;
+  }
+
+  .hint-row{
+    display:flex;
+    gap:18px;
+    margin-top:12px;
+    font-size:12.5px;
+    color:var(--text-soft);
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .hint-row .dot{
+    display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;
+  }
+  .dot.blocked{background:var(--ink);}
+  .dot.result{background:var(--bamboo);}
+
+  .row-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  button{
+    font-family:inherit;
+    font-size:13.5px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    border-radius:9px;
+    padding:11px 20px;
+    border:1.5px solid var(--ink);
+    cursor:pointer;
+    transition:transform .08s ease, opacity .15s ease;
+    background:var(--white);
+    color:var(--ink);
+  }
+  button:active{transform:scale(0.97);}
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .btn-primary:hover{opacity:0.88;}
+  .btn-ghost{
+    background:transparent;
+    color:var(--ink);
+  }
+  .btn-ghost:hover{background:var(--paper-2);}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+
+  /* ---------- 梯子區 ---------- */
+  #ladderHost{
+    display:flex;
+    justify-content:center;
+    padding:6px 0 4px;
+    overflow-x:auto;
+  }
+
+  /* ---------- 結果卡 ---------- */
+  .result-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:12px;
+    margin-top:6px;
+  }
+  .result-card{
+    background:var(--paper-2);
+    border:1px solid var(--line-strong);
+    border-radius:10px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    opacity:0;
+    transform:translateY(6px);
+    animation:pop .4s ease forwards;
+  }
+  .result-card .name{font-weight:800;color:var(--ink);font-size:15px;}
+  .result-card .time{
+    font-family:"SF Mono",Consolas,Menlo,monospace;
+    background:var(--bamboo);
+    color:var(--ink);
+    padding:4px 10px;
+    border-radius:6px;
+    font-weight:700;
+    font-size:13.5px;
+  }
+  @keyframes pop{to{opacity:1;transform:translateY(0);}}
+
+  /* ---------- 錯誤 / 診斷 ---------- */
+  .diag{
+    display:none;
+    background:#FBEDE7;
+    border:1px solid var(--warn);
+    border-radius:10px;
+    padding:16px 18px;
+    margin-top:16px;
+    color:#7A2E1B;
+    font-size:13.5px;
+    line-height:1.8;
+  }
+  .diag.show{display:block;}
+  .diag b{color:var(--warn);}
+  .diag .path{
+    font-family:"SF Mono",Consolas,Menlo,monospace;
+    background:#fff;
+    border:1px solid #eecfc4;
+    border-radius:6px;
+    padding:8px 10px;
+    display:inline-block;
+    margin-top:6px;
+    font-size:12.5px;
+  }
+
+  .footnote{
+    font-size:12px;
+    color:var(--text-soft);
+    margin-top:10px;
+    line-height:1.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">LADDER · 1對1配對抽籤</div>
+    <h1 id="pageTitle" contenteditable="true" spellcheck="false">爬梯子分配</h1>
+    <div class="title-hint">↑ 點擊標題可直接修改活動名稱</div>
+    <div class="sub">新增你的成員與時間點，點擊表格中的格子標記該成員在該時間點「無法參加」（黑格）。抽籤時會自動避開所有黑格，一次算出可行解 —— 不用無限重抽。</div>
+  </header>
+
+  <div class="panel">
+    <h2>成員與時間點 <span class="tag">可自由新增／刪除，不限數量</span></h2>
+    <div class="manage-grid">
+      <div class="manage-col">
+        <label class="col-title">成員名單</label>
+        <div class="chip-list" id="memberChips"></div>
+        <div class="add-row">
+          <input type="text" id="memberInput" placeholder="輸入成員名稱，按 Enter 新增">
+          <button class="btn-ghost" id="addMemberBtn">新增</button>
+        </div>
+      </div>
+      <div class="manage-col">
+        <label class="col-title">時間點</label>
+        <div class="chip-list" id="timeChips"></div>
+        <div class="add-row">
+          <input type="text" id="timeInput" placeholder="輸入時間點，按 Enter 新增">
+          <button class="btn-ghost" id="addTimeBtn">新增</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>限制表格 <span class="tag">點擊格子切換 有/無 限制</span></h2>
+    <div class="table-scroll">
+      <table id="gridTable"></table>
+    </div>
+    <div class="hint-row">
+      <span><span class="dot blocked"></span>該成員不可選這個時間</span>
+      <span><span class="dot result"></span>抽籤結果</span>
+    </div>
+    <div class="row-actions">
+      <button class="btn-primary" id="drawBtn">開始爬梯子</button>
+      <button class="btn-ghost" id="resetBtn">清空限制</button>
+      <button class="btn-ghost" id="reshuffleBtn" disabled>重新抽一次</button>
+    </div>
+  </div>
+
+  <div class="panel" id="ladderPanel" style="display:none;">
+    <h2>爬梯子過程</h2>
+    <div id="ladderHost"></div>
+  </div>
+
+  <div class="panel" id="resultPanel" style="display:none;">
+    <h2>分配結果</h2>
+    <div class="result-grid" id="resultGrid"></div>
+  </div>
+
+  <div class="diag" id="diagBox"></div>
+
+</div>
+
+<script>
+/* ================= 資料（動態，可自由增減） ================= */
+let MEMBERS = ["成員A","成員B","成員C","成員D"];
+let TIMES   = ["時段1","時段2","時段3","時段4"];
+
+// blocked[memberIndex] = Set(timeIndex)
+let blocked = MEMBERS.map(()=> new Set());
+
+let currentAssignment = null;
+
+/* ================= 標題 ================= */
+const pageTitleEl = document.getElementById('pageTitle');
+pageTitleEl.addEventListener('blur', ()=>{
+  if(pageTitleEl.textContent.trim()==='') pageTitleEl.textContent = '爬梯子分配';
+  document.title = pageTitleEl.textContent.trim();
+});
+pageTitleEl.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); pageTitleEl.blur(); }
+});
+
+/* ================= 名單管理（成員 / 時間點） ================= */
+const memberChips = document.getElementById('memberChips');
+const timeChips = document.getElementById('timeChips');
+const memberInput = document.getElementById('memberInput');
+const timeInput = document.getElementById('timeInput');
+
+function renderChips(){
+  memberChips.innerHTML = '';
+  if(MEMBERS.length===0){
+    memberChips.innerHTML = '<div class="empty-note">尚未新增任何成員</div>';
+  }
+  MEMBERS.forEach((m,i)=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `<span>${escapeHtml(m)}</span><span class="del" data-idx="${i}">✕</span>`;
+    chip.querySelector('.del').addEventListener('click', ()=> removeMember(i));
+    memberChips.appendChild(chip);
+  });
+
+  timeChips.innerHTML = '';
+  if(TIMES.length===0){
+    timeChips.innerHTML = '<div class="empty-note">尚未新增任何時間點</div>';
+  }
+  TIMES.forEach((t,i)=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `<span>${escapeHtml(t)}</span><span class="del" data-idx="${i}">✕</span>`;
+    chip.querySelector('.del').addEventListener('click', ()=> removeTime(i));
+    timeChips.appendChild(chip);
+  });
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function addMember(){
+  const v = memberInput.value.trim();
+  if(!v) return;
+  if(MEMBERS.includes(v)){ memberInput.value=''; return; }
+  MEMBERS.push(v);
+  blocked.push(new Set());
+  memberInput.value = '';
+  renderChips();
+  renderTable();
+  resetResults();
+}
+
+function removeMember(idx){
+  MEMBERS.splice(idx,1);
+  blocked.splice(idx,1);
+  renderChips();
+  renderTable();
+  resetResults();
+}
+
+function addTime(){
+  const v = timeInput.value.trim();
+  if(!v) return;
+  if(TIMES.includes(v)){ timeInput.value=''; return; }
+  TIMES.push(v);
+  timeInput.value = '';
+  renderChips();
+  renderTable();
+  resetResults();
+}
+
+function removeTime(idx){
+  TIMES.splice(idx,1);
+  blocked.forEach(s=>{
+    // 重新映射 index：移除該時間點後，所有比它大的 index 要往前移一位
+    const newSet = new Set();
+    s.forEach(ti=>{
+      if(ti === idx) return;
+      newSet.add(ti > idx ? ti-1 : ti);
+    });
+    s.clear();
+    newSet.forEach(v=>s.add(v));
+  });
+  renderChips();
+  renderTable();
+  resetResults();
+}
+
+document.getElementById('addMemberBtn').addEventListener('click', addMember);
+document.getElementById('addTimeBtn').addEventListener('click', addTime);
+memberInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addMember(); }});
+timeInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addTime(); }});
+
+/* ================= 表格渲染 ================= */
+const gridTable = document.getElementById('gridTable');
+
+function renderTable(){
+  if(MEMBERS.length===0 || TIMES.length===0){
+    gridTable.innerHTML = `<tr><td style="padding:20px;color:var(--text-soft);border:none;">請先於上方新增至少一位成員與一個時間點</td></tr>`;
+    return;
+  }
+  let html = '<thead><tr><th class="corner">成員＼時間</th>';
+  TIMES.forEach(t=> html += `<th>${escapeHtml(t)}</th>`);
+  html += '</tr></thead><tbody>';
+  MEMBERS.forEach((m,mi)=>{
+    html += `<tr><td class="name-cell">${escapeHtml(m)}</td>`;
+    TIMES.forEach((t,ti)=>{
+      const isBlocked = blocked[mi] && blocked[mi].has(ti);
+      html += `<td class="cell${isBlocked?' blocked':''}" data-mi="${mi}" data-ti="${ti}"></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  gridTable.innerHTML = html;
+
+  gridTable.querySelectorAll('td.cell').forEach(td=>{
+    td.addEventListener('click', ()=>{
+      const mi = +td.dataset.mi, ti = +td.dataset.ti;
+      if(blocked[mi].has(ti)) blocked[mi].delete(ti);
+      else blocked[mi].add(ti);
+      td.classList.toggle('blocked');
+      resetResults();
+    });
+  });
+}
+renderChips();
+renderTable();
+
+/* ================= 配對演算法 =================
+   1對1完美匹配 + 硬約束（黑格不可選）
+   策略：MRV（可用選項最少者優先）+ 回溯法。
+   規模極小時即使最壞情況回溯也是毫秒級，
+   且保證找到解或明確回報「無解＋原因」，不會卡在無窮重抽。
+   ※ 此區塊邏輯與先前版本完全相同，僅改讀取動態 MEMBERS / TIMES。
+================================================= */
+function findAssignment(){
+  const n = MEMBERS.length;
+  const timeUsed = new Array(TIMES.length).fill(false);
+  const assignment = new Array(n).fill(-1);
+
+  const options = MEMBERS.map((_,mi)=>{
+    const list = [];
+    for(let ti=0; ti<TIMES.length; ti++){
+      if(!blocked[mi].has(ti)) list.push(ti);
+    }
+    return shuffle(list);
+  });
+
+  let failMemberIdx = -1;
+
+  function backtrack(remainingMembers){
+    if(remainingMembers.length === 0) return true;
+
+    let pickPos = 0, best = Infinity;
+    remainingMembers.forEach((mi, pos)=>{
+      const avail = options[mi].filter(ti=>!timeUsed[ti]).length;
+      if(avail < best){ best = avail; pickPos = pos; }
+    });
+    const mi = remainingMembers[pickPos];
+    const rest = remainingMembers.slice(0,pickPos).concat(remainingMembers.slice(pickPos+1));
+
+    const candidates = options[mi].filter(ti=>!timeUsed[ti]);
+    if(candidates.length === 0){
+      failMemberIdx = mi;
+      return false;
+    }
+
+    for(const ti of candidates){
+      timeUsed[ti] = true;
+      assignment[mi] = ti;
+      if(backtrack(rest)) return true;
+      timeUsed[ti] = false;
+      assignment[mi] = -1;
+    }
+    failMemberIdx = mi;
+    return false;
+  }
+
+  const ok = backtrack(MEMBERS.map((_,i)=>i));
+  return { ok, assignment, failMemberIdx };
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+/* ================= 診斷訊息（無解時） ================= */
+function showDiagnosis(result){
+  const diag = document.getElementById('diagBox');
+  const mi = result.failMemberIdx;
+  const memberName = mi>=0 ? MEMBERS[mi] : "（未知）";
+
+  const n = MEMBERS.length;
+  let bottleneckMsg = "";
+  const availSets = MEMBERS.map((_,i)=>{
+    const s = new Set();
+    for(let ti=0; ti<TIMES.length; ti++) if(!blocked[i].has(ti)) s.add(ti);
+    return s;
+  });
+
+  outer:
+  for(let size=1; size<=n; size++){
+    const combo = (start, chosen)=>{
+      if(chosen.length===size){
+        const union = new Set();
+        chosen.forEach(i=> availSets[i].forEach(t=>union.add(t)));
+        if(union.size < size){
+          const names = chosen.map(i=>MEMBERS[i]).join('、');
+          const times = [...union].map(t=>TIMES[t]).join('、') || "（無任何可用時間）";
+          bottleneckMsg = `成員 <b>${names}</b> 這 ${size} 人，加起來只能使用 <b>${union.size}</b> 個時間點（${times}），人數比可用時間點還多，無法每人各分到一個獨立時間。`;
+          return true;
+        }
+      }
+      for(let i=start;i<n;i++){
+        if(combo(i+1, chosen.concat(i))) return true;
+      }
+      return false;
+    };
+    if(combo(0, [])) break outer;
+  }
+
+  diag.innerHTML = `
+    <b>目前的限制條件無解</b>：找不到一種分配方式，能讓每位成員都拿到一個「自己沒被限制」且「彼此不重複」的時間點。<br>
+    ${bottleneckMsg || `卡在成員 <b>${memberName}</b>：其餘成員已用掉所有 ${memberName} 可用的時間點。`}
+    <br><span class="path">請解除部分限制格，或新增更多時間點後再試一次。</span>
+  `;
+  diag.classList.add('show');
+}
+
+function hideDiagnosis(){
+  document.getElementById('diagBox').classList.remove('show');
+}
+
+/* ================= 梯子繪製與動畫 =================
+   ※ 路徑追蹤邏輯與先前修正版本完全相同：
+   同一層內每個 lane 最多只參與一次交換，確保單一、不衝突的映射。
+================================================= */
+function buildLadderSVG(assignment){
+  const host = document.getElementById('ladderHost');
+  const n = MEMBERS.length;
+  const laneW = 92;
+  const width = laneW * n + 40;
+  const topY = 60;
+  const bottomY = 430;
+  const laneX = i => 40 + laneW*i + laneW/2;
+
+  const rungLevels = Math.max(9, n+2);
+  const rungsByLevel = [];
+  for(let lv=1; lv<rungLevels; lv++){
+    const y = topY + (bottomY-topY) * lv/rungLevels;
+    const usedLanes = new Set();
+    const levelRungs = [];
+    const count = n>=3 ? (1 + Math.floor(Math.random()*2)) : 1;
+    let tries=0;
+    while(levelRungs.length < count && tries<30){
+      tries++;
+      const i = Math.floor(Math.random()*(n-1));
+      if(usedLanes.has(i) || usedLanes.has(i+1)) continue;
+      usedLanes.add(i); usedLanes.add(i+1);
+      levelRungs.push(i);
+    }
+    levelRungs.sort((a,b)=>a-b);
+    rungsByLevel.push({y, lanes:levelRungs});
+  }
+  const rungs = [];
+  rungsByLevel.forEach(lv=> lv.lanes.forEach(i=> rungs.push({y:lv.y, i})));
+
+  function tracePath(startLane){
+    let lane = startLane;
+    const points = [{x:laneX(lane), y:bottomY}];
+    for(let idx = rungsByLevel.length-1; idx>=0; idx--){
+      const level = rungsByLevel[idx];
+      const hit = level.lanes.find(i=> i===lane || i+1===lane);
+      if(hit === undefined) continue;
+      const newLane = (hit === lane) ? lane+1 : lane-1;
+      points.push({x:laneX(lane), y:level.y});
+      points.push({x:laneX(newLane), y:level.y});
+      lane = newLane;
+    }
+    points.push({x:laneX(lane), y:topY});
+    return {points, endLane:lane};
+  }
+
+  const colors = ["#B8452F","#2E6B4F","#8A6BB8","#3C6E9E","#C08A2E","#7A4F3A","#4A5D6E","#9A6B4F","#5C7A3E","#7A3E5C"];
+
+  let svg = `<svg viewBox="0 0 ${width} 470" width="100%" style="max-width:${width}px;height:auto;font-family:inherit;">`;
+
+  for(let i=0;i<n;i++){
+    svg += `<line x1="${laneX(i)}" y1="${topY}" x2="${laneX(i)}" y2="${bottomY}" stroke="var(--line-strong)" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  rungs.forEach(r=>{
+    svg += `<line x1="${laneX(r.i)}" y1="${r.y}" x2="${laneX(r.i+1)}" y2="${r.y}" stroke="var(--line-strong)" stroke-width="3" stroke-linecap="round"/>`;
+  });
+
+  const traces = MEMBERS.map((_,mi)=> tracePath(mi));
+
+  MEMBERS.forEach((m,i)=>{
+    svg += `<text x="${laneX(i)}" y="${bottomY+26}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${escapeHtml(m)}</text>`;
+  });
+
+  const laneToTime = new Array(n).fill(null);
+  traces.forEach((tr,mi)=>{
+    const ti = assignment[mi];
+    laneToTime[tr.endLane] = TIMES[ti];
+  });
+  laneToTime.forEach((t,i)=>{
+    svg += `<text x="${laneX(i)}" y="${topY-22}" text-anchor="middle" font-size="13" font-weight="800" fill="var(--ink)" font-family="'SF Mono',Consolas,Menlo,monospace">${t?escapeHtml(t):''}</text>`;
+  });
+
+  svg += `</svg>`;
+  host.innerHTML = svg;
+
+  const svgEl = host.querySelector('svg');
+  traces.forEach((tr, mi)=>{
+    const pathStr = tr.points.map((p,idx)=> (idx===0?'M':'L')+p.x+','+p.y).join(' ');
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathStr);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', colors[mi % colors.length]);
+    path.setAttribute('stroke-width','5');
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('stroke-linejoin','round');
+    path.setAttribute('opacity','0.92');
+    svgEl.appendChild(path);
+
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    path.style.transition = `stroke-dashoffset 900ms ease ${mi*180}ms`;
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{ path.style.strokeDashoffset = 0; });
+    });
+  });
+
+  return traces.length * 180 + 1000;
+}
+
+/* ================= 結果卡渲染 ================= */
+function renderResultCards(assignment){
+  const grid = document.getElementById('resultGrid');
+  grid.innerHTML = '';
+  MEMBERS.forEach((m,mi)=>{
+    const ti = assignment[mi];
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.style.animationDelay = (mi*0.12)+'s';
+    card.innerHTML = `<span class="name">${escapeHtml(m)}</span><span class="time">${escapeHtml(TIMES[ti])}</span>`;
+    grid.appendChild(card);
+  });
+}
+
+function markResultOnTable(assignment){
+  document.querySelectorAll('td.cell.result').forEach(td=>td.classList.remove('result'));
+  MEMBERS.forEach((_,mi)=>{
+    const ti = assignment[mi];
+    const td = gridTable.querySelector(`td.cell[data-mi="${mi}"][data-ti="${ti}"]`);
+    if(td) td.classList.add('result');
+  });
+}
+
+/* ================= 主流程 ================= */
+function resetResults(){
+  currentAssignment = null;
+  document.getElementById('ladderPanel').style.display = 'none';
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('reshuffleBtn').disabled = true;
+  hideDiagnosis();
+  document.querySelectorAll('td.cell.result').forEach(td=>td.classList.remove('result'));
+}
+
+function runDraw(){
+  hideDiagnosis();
+
+  if(MEMBERS.length===0 || TIMES.length===0){
+    document.getElementById('diagBox').innerHTML = `<b>尚無法抽籤</b>：請先於上方新增至少一位成員與一個時間點。`;
+    document.getElementById('diagBox').classList.add('show');
+    return;
+  }
+  if(TIMES.length < MEMBERS.length){
+    document.getElementById('diagBox').innerHTML = `<b>時間點數量不足</b>：目前有 ${MEMBERS.length} 位成員，但只有 ${TIMES.length} 個時間點，無法讓每人各分到一個獨立時間點。請新增更多時間點。`;
+    document.getElementById('diagBox').classList.add('show');
+    return;
+  }
+
+  const result = findAssignment();
+  if(!result.ok){
+    document.getElementById('ladderPanel').style.display = 'none';
+    document.getElementById('resultPanel').style.display = 'none';
+    document.getElementById('reshuffleBtn').disabled = true;
+    showDiagnosis(result);
+    return;
+  }
+  currentAssignment = result.assignment;
+  document.getElementById('ladderPanel').style.display = 'block';
+  document.getElementById('resultPanel').style.display = 'none';
+  buildLadderSVG(currentAssignment);
+  document.getElementById('reshuffleBtn').disabled = false;
+
+  const total = MEMBERS.length*180 + 900;
+  setTimeout(()=>{
+    document.getElementById('resultPanel').style.display = 'block';
+    renderResultCards(currentAssignment);
+    markResultOnTable(currentAssignment);
+  }, total);
+}
+
+document.getElementById('drawBtn').addEventListener('click', runDraw);
+document.getElementById('reshuffleBtn').addEventListener('click', runDraw);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  blocked = MEMBERS.map(()=> new Set());
+  renderTable();
+  resetResults();
+});
+</script>
+</body>
+</html>
