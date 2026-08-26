@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>圖片視覺比對 DiffLens</title>
+  <meta name="description" content="兩張圖片的視覺差異比對：滑桿對照、洋蔥皮疊合、差異熱圖與閃爍切換，全部在瀏覽器完成，圖片不會上傳。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 20px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Slots (載入區) ── */
+    .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 760px) { .slots { grid-template-columns: 1fr; } }
+
+    .slot {
+      position: relative;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    .slot__head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--al-bg-alt);
+      border-bottom: 1px solid var(--al-border-soft);
+    }
+    .slot__tag {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; flex: 0 0 auto;
+      border-radius: var(--al-radius-full);
+      background: var(--al-accent); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 12px; font-weight: 700;
+    }
+    .slot__tag--b { background: var(--al-ink); }
+    .slot__name {
+      font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto;
+    }
+    .slot__dims { font-family: var(--al-font-mono); font-size: 11px; color: var(--al-slate-400); white-space: nowrap; }
+
+    .dropzone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; min-height: 148px; padding: 20px; cursor: pointer;
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-slate-500);
+      text-align: center; transition: background .15s ease, border-color .15s ease;
+      border: 2px dashed transparent;
+    }
+    .dropzone:hover { background: var(--al-accent-soft); color: var(--al-accent); }
+    .dropzone.is-dragging { background: var(--al-accent-soft); border-color: var(--al-accent); color: var(--al-accent); }
+    .dropzone svg { opacity: .5; }
+    .dropzone kbd {
+      font-family: var(--al-font-mono); font-size: 11px;
+      background: var(--al-bg-alt); border: 1px solid var(--al-border);
+      border-radius: 5px; padding: 1px 5px;
+    }
+
+    .thumb {
+      display: block; width: 100%; height: 148px; object-fit: contain;
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 16px 16px; background-position: 0 0, 8px 8px;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      padding: 12px; margin-bottom: 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .toolbar__sep { width: 1px; height: 22px; background: var(--al-border); margin: 0 2px; }
+    .toolbar__spacer { flex: 1 1 auto; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); white-space: nowrap; }
+    .field output {
+      font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700);
+      min-width: 46px; text-align: right;
+    }
+    select {
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+      background: var(--al-white); border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md); padding: 6px 8px; outline: none;
+    }
+    select:focus { border-color: var(--al-accent); }
+    input[type="range"] { width: 120px; accent-color: var(--al-accent); }
+    .field.is-off { opacity: .4; pointer-events: none; }
+
+    /* ── Stage ── */
+    .stage {
+      position: relative;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    .stage__head {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 14px;
+      background: var(--al-bg-alt);
+      border-bottom: 1px solid var(--al-border-soft);
+    }
+    .stage__title {
+      font-family: var(--al-font-body); font-size: 12px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--al-slate-700); margin: 0;
+    }
+    .stage__meta {
+      font-family: var(--al-font-mono); font-size: 11px; color: var(--al-slate-400);
+      margin-left: auto;
+    }
+    .stage__body {
+      position: relative; min-height: 380px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 18px;
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 20px 20px; background-position: 0 0, 10px 10px;
+      overflow: auto;
+    }
+
+    .viewport { position: relative; line-height: 0; }
+    .viewport canvas { display: block; max-width: 100%; height: auto; }
+    .viewport.is-side { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+    .viewport.is-side canvas { max-width: calc(50% - 7px); border: 1px solid var(--al-border); }
+
+    /* 滑桿模式 */
+    .swipe-handle {
+      position: absolute; top: 0; bottom: 0; width: 2px;
+      background: var(--al-accent); cursor: ew-resize; z-index: 3;
+      transform: translateX(-1px); touch-action: none;
+    }
+    .swipe-handle::after {
+      content: '';
+      position: absolute; top: 50%; left: 50%;
+      width: 30px; height: 30px; margin: -15px 0 0 -15px;
+      border-radius: 50%;
+      background: var(--al-accent);
+      box-shadow: var(--al-shadow-cta);
+    }
+    .swipe-handle::before {
+      content: '⇔';
+      position: absolute; top: 50%; left: 50%;
+      width: 30px; height: 30px; margin: -15px 0 0 -15px; z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--al-white); font-size: 14px; line-height: 1;
+    }
+    .swipe-label {
+      position: absolute; top: 8px; z-index: 2;
+      padding: 3px 9px; border-radius: var(--al-radius-full);
+      font-family: var(--al-font-body); font-size: 11px; font-weight: 600;
+      background: rgba(26,26,26,.72); color: var(--al-white); pointer-events: none;
+    }
+    .swipe-label--a { left: 8px; }
+    .swipe-label--b { right: 8px; }
+
+    .empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 40px 24px; text-align: center;
+      font-family: var(--al-font-body); font-size: 13.5px; color: var(--al-slate-400);
+    }
+    .empty svg { opacity: .4; }
+
+    /* ── Stats ── */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+    @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat {
+      padding: 12px 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      box-shadow: var(--al-shadow-card);
+    }
+    .stat__label {
+      font-family: var(--al-font-body); font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--al-slate-400); margin-bottom: 4px;
+    }
+    .stat__value { font-family: var(--al-font-mono); font-size: 18px; color: var(--al-ink); }
+    .stat__sub { font-family: var(--al-font-body); font-size: 11px; color: var(--al-slate-500); margin-top: 2px; }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 14px; padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 50; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .hidden { display: none !important; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>圖片視覺比對 DiffLens</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+    </div>
+    <p>載入兩張圖片，用滑桿對照、洋蔥皮疊合、差異熱圖或閃爍切換找出改了哪裡。圖片只在你的瀏覽器裡解碼，不會上傳。</p>
+  </header>
+
+  <!-- 載入區 -->
+  <div class="slots">
+    <section class="slot" aria-label="圖片 A">
+      <div class="slot__head">
+        <span class="slot__tag">A</span>
+        <span class="slot__name" id="name-a">尚未載入</span>
+        <span class="slot__dims" id="dims-a"></span>
+      </div>
+      <div class="dropzone" id="drop-a" role="button" tabindex="0" aria-label="載入圖片 A">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+        </svg>
+        <span>點擊選擇、拖放，或按 <kbd>Ctrl</kbd>+<kbd>V</kbd> 貼上「修改前」的圖片</span>
+      </div>
+      <img class="thumb hidden" id="thumb-a" alt="圖片 A 縮圖" />
+    </section>
+
+    <section class="slot" aria-label="圖片 B">
+      <div class="slot__head">
+        <span class="slot__tag slot__tag--b">B</span>
+        <span class="slot__name" id="name-b">尚未載入</span>
+        <span class="slot__dims" id="dims-b"></span>
+      </div>
+      <div class="dropzone" id="drop-b" role="button" tabindex="0" aria-label="載入圖片 B">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+        </svg>
+        <span>點擊選擇、拖放，或按 <kbd>Ctrl</kbd>+<kbd>V</kbd> 貼上「修改後」的圖片</span>
+      </div>
+      <img class="thumb hidden" id="thumb-b" alt="圖片 B 縮圖" />
+    </section>
+  </div>
+
+  <input type="file" id="file-a" class="visually-hidden" accept="image/*" />
+  <input type="file" id="file-b" class="visually-hidden" accept="image/*" />
+
+  <!-- 操作列 -->
+  <div class="toolbar" role="toolbar" aria-label="操作列">
+    <div class="field">
+      <label for="mode">比對模式</label>
+      <select id="mode">
+        <option value="swipe">滑桿對照</option>
+        <option value="diff">差異熱圖</option>
+        <option value="onion">洋蔥皮疊合</option>
+        <option value="side">並排</option>
+        <option value="blink">閃爍切換</option>
+      </select>
+    </div>
+
+    <div class="field" id="f-threshold">
+      <label for="threshold">容差</label>
+      <input type="range" id="threshold" min="0" max="80" value="10" />
+      <output id="out-threshold">10</output>
+    </div>
+
+    <div class="field" id="f-opacity">
+      <label for="opacity">B 透明度</label>
+      <input type="range" id="opacity" min="0" max="100" value="50" />
+      <output id="out-opacity">50%</output>
+    </div>
+
+    <div class="field" id="f-speed">
+      <label for="speed">閃爍間隔</label>
+      <input type="range" id="speed" min="120" max="1600" step="20" value="500" />
+      <output id="out-speed">500ms</output>
+    </div>
+
+    <div class="toolbar__sep" aria-hidden="true"></div>
+
+    <div class="field">
+      <label for="fit">尺寸不符</label>
+      <select id="fit">
+        <option value="overlap">左上對齊比重疊區</option>
+        <option value="scale">把 B 縮放到 A 的尺寸</option>
+      </select>
+    </div>
+
+    <div class="toolbar__spacer"></div>
+
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-swap" type="button">交換 A / B</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-reset" type="button">重設</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-export" type="button">匯出差異圖</button>
+  </div>
+
+  <!-- 舞台 -->
+  <div class="stage">
+    <div class="stage__head">
+      <h2 class="stage__title" id="stage-title">比對結果</h2>
+      <span class="stage__meta" id="stage-meta"></span>
+    </div>
+    <div class="stage__body" id="stage-body">
+      <div class="empty" id="empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="9" height="16" rx="1.5"/><rect x="13" y="4" width="9" height="16" rx="1.5"/>
+        </svg>
+        <span>先載入 A 與 B 兩張圖片，比對結果會顯示在這裡</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 統計 -->
+  <div class="stats" id="stats" hidden>
+    <div class="stat">
+      <div class="stat__label">差異像素</div>
+      <div class="stat__value" id="st-changed">—</div>
+      <div class="stat__sub" id="st-changed-sub"></div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">差異比例</div>
+      <div class="stat__value" id="st-ratio">—</div>
+      <div class="stat__sub">超過容差的像素占比</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">最大色差</div>
+      <div class="stat__value" id="st-max">—</div>
+      <div class="stat__sub">單一像素 RGB 距離，滿分 255</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">比對耗時</div>
+      <div class="stat__value" id="st-time">—</div>
+      <div class="stat__sub" id="st-px"></div>
+    </div>
+  </div>
+
+  <div class="statusbar" id="status" role="status" aria-live="polite">等待載入圖片。</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     刻意不使用 localStorage / 同源 fetch / 外部 worker，
+     以便在大廳 sandbox="allow-scripts allow-forms" 的預覽視窗
+     （不透明來源 opaque origin）中也能完整運作。
+     圖片一律以 createImageBitmap(File) 解碼，不產生 object URL，
+     canvas 也就不會被跨來源污染，getImageData 永遠可用。
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    mode: $('mode'), threshold: $('threshold'), opacity: $('opacity'), speed: $('speed'),
+    fit: $('fit'), stageBody: $('stage-body'), stageTitle: $('stage-title'), stageMeta: $('stage-meta'),
+    empty: $('empty'), stats: $('stats'), status: $('status'), toast: $('toast')
+  };
+
+  var state = {
+    a: null,           // { bitmap, name, w, h }
+    b: null,
+    diffCanvas: null,  // 差異熱圖，供匯出使用
+    blinkTimer: null,
+    blinkOn: false,
+    swipePct: 50,
+    lastStats: null
+  };
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { els.toast.classList.remove('is-on'); }, 1900);
+  }
+
+  function setStatus(html, kind) {
+    els.status.className = 'statusbar' + (kind ? ' is-' + kind : '');
+    els.status.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtNum(n) { return n.toLocaleString('en-US'); }
+
+  function clearNode(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  /* ── 圖片載入 ───────────────────────────────────────────── */
+
+  function decode(file) {
+    if (!file || !/^image\//.test(file.type)) {
+      return Promise.reject(new Error('不是圖片檔（收到的類型是 ' + (file && file.type ? file.type : '未知') + '）'));
+    }
+    if (window.createImageBitmap) {
+      return createImageBitmap(file).catch(function (e) {
+        return decodeViaImg(file);   // 例如某些瀏覽器不支援 SVG bitmap
+      });
+    }
+    return decodeViaImg(file);
+  }
+
+  function decodeViaImg(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('瀏覽器無法解碼這個圖片檔，可能格式不支援或檔案毀損'));
+      };
+      img.src = url;
+    });
+  }
+
+  function toThumbURL(bitmap, w, h) {
+    // 縮圖用小 canvas 畫，避免把整張大圖塞進 DOM
+    var max = 320;
+    var scale = Math.min(1, max / Math.max(w, h));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * scale));
+    c.height = Math.max(1, Math.round(h * scale));
+    c.getContext('2d').drawImage(bitmap, 0, 0, c.width, c.height);
+    return c.toDataURL('image/png');
+  }
+
+  function loadInto(slot, file) {
+    decode(file).then(function (bitmap) {
+      var w = bitmap.width, h = bitmap.height;
+      state[slot] = { bitmap: bitmap, name: file.name || ('貼上的圖片.' + (file.type.split('/')[1] || 'png')), w: w, h: h };
+
+      $('name-' + slot).textContent = state[slot].name;
+      $('dims-' + slot).textContent = w + ' × ' + h;
+
+      var thumb = $('thumb-' + slot);
+      thumb.src = toThumbURL(bitmap, w, h);
+      thumb.classList.remove('hidden');
+      $('drop-' + slot).classList.add('hidden');
+
+      update();
+    }).catch(function (e) {
+      setStatus('載入圖片 ' + slot.toUpperCase() + ' 失敗：' + esc(e.message), 'error');
+      toast('載入失敗');
+    });
+  }
+
+  function wireSlot(slot) {
+    var zone = $('drop-' + slot);
+    var input = $('file-' + slot);
+    var head = zone.parentNode;
+
+    zone.addEventListener('click', function () { input.click(); });
+    zone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) loadInto(slot, input.files[0]);
+      input.value = '';
+    });
+
+    // 縮圖載入後也要能再換一張
+    $('thumb-' + slot).addEventListener('click', function () { input.click(); });
+    $('thumb-' + slot).style.cursor = 'pointer';
+    $('thumb-' + slot).title = '點擊更換這張圖片';
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      head.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('is-dragging'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      head.addEventListener(ev, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (ev === 'dragleave' && head.contains(e.relatedTarget)) return;
+        zone.classList.remove('is-dragging');
+      });
+    });
+    head.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (dt && dt.files && dt.files[0]) loadInto(slot, dt.files[0]);
+    });
+  }
+
+  wireSlot('a');
+  wireSlot('b');
+
+  // 貼上：先填 A，A 有了就填 B
+  window.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf('image/') === 0) {
+        var f = items[i].getAsFile();
+        if (f) { loadInto(state.a ? 'b' : 'a', f); e.preventDefault(); }
+        return;
+      }
+    }
+  });
+
+  /* ── 比對幾何 ───────────────────────────────────────────── */
+
+  function geometry() {
+    var a = state.a, b = state.b;
+    if (els.fit.value === 'scale') {
+      return { w: a.w, h: a.h, scaleB: true, sameSize: a.w === b.w && a.h === b.h };
+    }
+    return {
+      w: Math.min(a.w, b.w),
+      h: Math.min(a.h, b.h),
+      scaleB: false,
+      sameSize: a.w === b.w && a.h === b.h
+    };
+  }
+
+  function makeCanvas(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  function drawA(ctx, g) {
+    ctx.clearRect(0, 0, g.w, g.h);
+    ctx.drawImage(state.a.bitmap, 0, 0);
+  }
+
+  function drawB(ctx, g) {
+    ctx.clearRect(0, 0, g.w, g.h);
+    if (g.scaleB) ctx.drawImage(state.b.bitmap, 0, 0, state.b.w, state.b.h, 0, 0, g.w, g.h);
+    else ctx.drawImage(state.b.bitmap, 0, 0);
+  }
+
+  /* ── 差異計算 ───────────────────────────────────────────── */
+
+  function computeDiff(g, threshold) {
+    var t0 = performance.now();
+
+    var ca = makeCanvas(g.w, g.h), cb = makeCanvas(g.w, g.h);
+    var xa = ca.getContext('2d', { willReadFrequently: true });
+    var xb = cb.getContext('2d', { willReadFrequently: true });
+    drawA(xa, g);
+    drawB(xb, g);
+
+    var da = xa.getImageData(0, 0, g.w, g.h);
+    var db = xb.getImageData(0, 0, g.w, g.h);
+    var pa = da.data, pb = db.data;
+
+    var outCanvas = makeCanvas(g.w, g.h);
+    var outCtx = outCanvas.getContext('2d');
+    var outImg = outCtx.createImageData(g.w, g.h);
+    var po = outImg.data;
+
+    var total = g.w * g.h;
+    var changed = 0, maxDelta = 0;
+
+    for (var i = 0; i < pa.length; i += 4) {
+      var dr = pa[i]     - pb[i];
+      var dg = pa[i + 1] - pb[i + 1];
+      var dbb = pa[i + 2] - pb[i + 2];
+      var dal = pa[i + 3] - pb[i + 3];
+      if (dr < 0) dr = -dr;
+      if (dg < 0) dg = -dg;
+      if (dbb < 0) dbb = -dbb;
+      if (dal < 0) dal = -dal;
+
+      var delta = dr > dg ? dr : dg;
+      if (dbb > delta) delta = dbb;
+      if (dal > delta) delta = dal;
+      if (delta > maxDelta) maxDelta = delta;
+
+      if (delta > threshold) {
+        changed++;
+        // 差異點：以洋紅標示，越大越亮
+        var strength = 90 + Math.min(165, delta * 2);
+        po[i]     = strength;
+        po[i + 1] = 20;
+        po[i + 2] = Math.round(strength * 0.72);
+        po[i + 3] = 255;
+      } else {
+        // 相同區：轉成淡灰階當底圖，讓差異點跳出來
+        var lum = (pa[i] * 0.299 + pa[i + 1] * 0.587 + pa[i + 2] * 0.114);
+        var faded = Math.round(200 + lum * 0.2);
+        po[i]     = faded;
+        po[i + 1] = faded;
+        po[i + 2] = faded;
+        po[i + 3] = pa[i + 3] ? 255 : 0;
+      }
+    }
+
+    outCtx.putImageData(outImg, 0, 0);
+
+    return {
+      canvas: outCanvas,
+      changed: changed,
+      total: total,
+      ratio: total ? changed / total : 0,
+      maxDelta: maxDelta,
+      ms: Math.round(performance.now() - t0)
+    };
+  }
+
+  /* ── 渲染各模式 ─────────────────────────────────────────── */
+
+  function renderSwipe(g) {
+    var wrap = document.createElement('div');
+    wrap.className = 'viewport';
+
+    var base = makeCanvas(g.w, g.h);
+    drawB(base.getContext('2d'), g);         // 底層放 B
+    wrap.appendChild(base);
+
+    var top = makeCanvas(g.w, g.h);
+    drawA(top.getContext('2d'), g);          // 上層放 A，用 clip 露出左半
+    top.style.position = 'absolute';
+    top.style.top = '0';
+    top.style.left = '0';
+    top.style.width = '100%';
+    wrap.appendChild(top);
+
+    var handle = document.createElement('div');
+    handle.className = 'swipe-handle';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-label', '左右拖動比較 A 與 B');
+    wrap.appendChild(handle);
+
+    var la = document.createElement('span'); la.className = 'swipe-label swipe-label--a'; la.textContent = 'A';
+    var lb = document.createElement('span'); lb.className = 'swipe-label swipe-label--b'; lb.textContent = 'B';
+    wrap.appendChild(la); wrap.appendChild(lb);
+
+    function apply(pct) {
+      state.swipePct = Math.max(0, Math.min(100, pct));
+      top.style.clipPath = 'inset(0 ' + (100 - state.swipePct) + '% 0 0)';
+      handle.style.left = state.swipePct + '%';
+    }
+    apply(state.swipePct);
+
+    var dragging = false;
+    function pctFromEvent(e) {
+      var rect = wrap.getBoundingClientRect();
+      var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      return (x / rect.width) * 100;
+    }
+    function down(e) { dragging = true; apply(pctFromEvent(e)); e.preventDefault(); }
+    function move(e) { if (dragging) apply(pctFromEvent(e)); }
+    function up() { dragging = false; }
+
+    handle.addEventListener('pointerdown', down);
+    wrap.addEventListener('pointerdown', down);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    wrap._cleanup = function () {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+
+    els.stageTitle.textContent = '比對結果 · 滑桿對照（左 A / 右 B）';
+    return wrap;
+  }
+
+  function renderOnion(g) {
+    var wrap = document.createElement('div');
+    wrap.className = 'viewport';
+    var c = makeCanvas(g.w, g.h);
+    var ctx = c.getContext('2d');
+    drawA(ctx, g);
+    ctx.globalAlpha = Number(els.opacity.value) / 100;
+    if (g.scaleB) ctx.drawImage(state.b.bitmap, 0, 0, state.b.w, state.b.h, 0, 0, g.w, g.h);
+    else ctx.drawImage(state.b.bitmap, 0, 0);
+    ctx.globalAlpha = 1;
+    wrap.appendChild(c);
+    els.stageTitle.textContent = '比對結果 · 洋蔥皮疊合';
+    return wrap;
+  }
+
+  function renderSide(g) {
+    var wrap = document.createElement('div');
+    wrap.className = 'viewport is-side';
+    var ca = makeCanvas(g.w, g.h); drawA(ca.getContext('2d'), g);
+    var cb = makeCanvas(g.w, g.h); drawB(cb.getContext('2d'), g);
+    ca.title = 'A：' + state.a.name;
+    cb.title = 'B：' + state.b.name;
+    wrap.appendChild(ca); wrap.appendChild(cb);
+    els.stageTitle.textContent = '比對結果 · 並排（左 A / 右 B）';
+    return wrap;
+  }
+
+  function renderBlink(g) {
+    var wrap = document.createElement('div');
+    wrap.className = 'viewport';
+    var c = makeCanvas(g.w, g.h);
+    var ctx = c.getContext('2d');
+    var label = document.createElement('span');
+    label.className = 'swipe-label swipe-label--a';
+    wrap.appendChild(c);
+    wrap.appendChild(label);
+
+    function tick() {
+      state.blinkOn = !state.blinkOn;
+      if (state.blinkOn) { drawB(ctx, g); label.textContent = 'B'; }
+      else { drawA(ctx, g); label.textContent = 'A'; }
+    }
+    tick();
+    state.blinkTimer = setInterval(tick, Number(els.speed.value));
+    wrap._cleanup = function () { clearInterval(state.blinkTimer); state.blinkTimer = null; };
+
+    els.stageTitle.textContent = '比對結果 · 閃爍切換';
+    return wrap;
+  }
+
+  function renderDiff(g, stats) {
+    var wrap = document.createElement('div');
+    wrap.className = 'viewport';
+    wrap.appendChild(stats.canvas);
+    els.stageTitle.textContent = '比對結果 · 差異熱圖（洋紅 = 有變動）';
+    return wrap;
+  }
+
+  /* ── 主更新 ─────────────────────────────────────────────── */
+
+  function teardown() {
+    if (state.blinkTimer) { clearInterval(state.blinkTimer); state.blinkTimer = null; }
+    var vp = els.stageBody.querySelector('.viewport');
+    if (vp && vp._cleanup) vp._cleanup();
+  }
+
+  function update() {
+    teardown();
+    syncFields();
+
+    if (!state.a || !state.b) {
+      clearNode(els.stageBody);
+      els.stageBody.appendChild(els.empty);
+      els.empty.classList.remove('hidden');
+      els.stats.hidden = true;
+      els.stageTitle.textContent = '比對結果';
+      els.stageMeta.textContent = '';
+      setStatus(state.a || state.b ? '已載入一張圖片，再載入另一張就會開始比對。' : '等待載入圖片。');
+      return;
+    }
+
+    var g;
+    try {
+      g = geometry();
+    } catch (e) {
+      setStatus('無法決定比對範圍：' + esc(e.message), 'error');
+      return;
+    }
+
+    if (g.w < 1 || g.h < 1) {
+      setStatus('兩張圖片沒有重疊區域可以比較。', 'error');
+      return;
+    }
+
+    var PIXEL_WARN = 40e6;
+    if (g.w * g.h > PIXEL_WARN) {
+      setStatus('圖片過大（' + fmtNum(g.w * g.h) + ' 像素），逐像素比對可能讓分頁停止回應數秒。', 'warn');
+    }
+
+    var stats = null;
+    try {
+      stats = computeDiff(g, Number(els.threshold.value));
+    } catch (e) {
+      setStatus('計算差異失敗：' + esc(e.message) + '（圖片可能超過瀏覽器的 canvas 上限）', 'error');
+      els.stats.hidden = true;
+      return;
+    }
+
+    state.diffCanvas = stats.canvas;
+    state.lastStats = stats;
+
+    clearNode(els.stageBody);
+    var mode = els.mode.value;
+    var view;
+    if (mode === 'diff') view = renderDiff(g, stats);
+    else if (mode === 'onion') view = renderOnion(g);
+    else if (mode === 'side') view = renderSide(g);
+    else if (mode === 'blink') view = renderBlink(g);
+    else view = renderSwipe(g);
+    els.stageBody.appendChild(view);
+
+    // 統計
+    els.stats.hidden = false;
+    $('st-changed').textContent = fmtNum(stats.changed);
+    $('st-changed-sub').textContent = '總計 ' + fmtNum(stats.total) + ' 像素';
+    $('st-ratio').textContent = (stats.ratio * 100).toFixed(stats.ratio > 0 && stats.ratio < 0.0001 ? 4 : 2) + '%';
+    $('st-max').textContent = String(stats.maxDelta);
+    $('st-time').textContent = stats.ms + ' ms';
+    $('st-px').textContent = g.w + ' × ' + g.h + ' 比對範圍';
+    els.stageMeta.textContent = g.w + ' × ' + g.h + ' · 容差 ' + els.threshold.value;
+
+    // 狀態訊息
+    var msgs = [];
+    if (!g.sameSize) {
+      msgs.push('兩張圖尺寸不同（A <code>' + state.a.w + '×' + state.a.h + '</code>、B <code>' +
+                state.b.w + '×' + state.b.h + '</code>），' +
+                (g.scaleB ? '已把 B 縮放到 A 的尺寸後比較。縮放本身會製造差異，請把它算進誤差。'
+                          : '目前只比較左上對齊的重疊區 <code>' + g.w + '×' + g.h + '</code>。'));
+    }
+    if (stats.changed === 0) {
+      msgs.push('在容差 <code>' + els.threshold.value + '</code> 之下，兩張圖<strong>完全相同</strong>。');
+      setStatus(msgs.join(' '), g.sameSize ? 'ok' : 'warn');
+    } else {
+      msgs.push('找到 <code>' + fmtNum(stats.changed) + '</code> 個差異像素（' +
+                (stats.ratio * 100).toFixed(2) + '%），最大色差 <code>' + stats.maxDelta + '</code>。');
+      setStatus(msgs.join(' '), g.sameSize ? null : 'warn');
+    }
+  }
+
+  /* ── 欄位連動 ───────────────────────────────────────────── */
+
+  function syncFields() {
+    var m = els.mode.value;
+    $('f-threshold').classList.toggle('is-off', false);          // 容差一律影響統計
+    $('f-opacity').classList.toggle('is-off', m !== 'onion');
+    $('f-speed').classList.toggle('is-off', m !== 'blink');
+  }
+
+  /* ── 事件 ───────────────────────────────────────────────── */
+
+  els.mode.addEventListener('change', update);
+  els.fit.addEventListener('change', update);
+
+  els.threshold.addEventListener('input', function () {
+    $('out-threshold').textContent = els.threshold.value;
+  });
+  els.threshold.addEventListener('change', update);
+
+  els.opacity.addEventListener('input', function () {
+    $('out-opacity').textContent = els.opacity.value + '%';
+    if (els.mode.value === 'onion' && state.a && state.b) update();
+  });
+
+  els.speed.addEventListener('input', function () {
+    $('out-speed').textContent = els.speed.value + 'ms';
+  });
+  els.speed.addEventListener('change', function () {
+    if (els.mode.value === 'blink' && state.a && state.b) update();
+  });
+
+  $('btn-swap').addEventListener('click', function () {
+    if (!state.a && !state.b) { toast('還沒有圖片可以交換'); return; }
+    var tmp = state.a; state.a = state.b; state.b = tmp;
+    ['a', 'b'].forEach(function (slot) {
+      var s = state[slot];
+      if (s) {
+        $('name-' + slot).textContent = s.name;
+        $('dims-' + slot).textContent = s.w + ' × ' + s.h;
+        $('thumb-' + slot).src = toThumbURL(s.bitmap, s.w, s.h);
+        $('thumb-' + slot).classList.remove('hidden');
+        $('drop-' + slot).classList.add('hidden');
+      } else {
+        $('name-' + slot).textContent = '尚未載入';
+        $('dims-' + slot).textContent = '';
+        $('thumb-' + slot).classList.add('hidden');
+        $('drop-' + slot).classList.remove('hidden');
+      }
+    });
+    update();
+    toast('已交換 A 與 B');
+  });
+
+  $('btn-reset').addEventListener('click', function () {
+    teardown();
+    state.a = null; state.b = null; state.diffCanvas = null; state.swipePct = 50;
+    ['a', 'b'].forEach(function (slot) {
+      $('name-' + slot).textContent = '尚未載入';
+      $('dims-' + slot).textContent = '';
+      $('thumb-' + slot).classList.add('hidden');
+      $('thumb-' + slot).removeAttribute('src');
+      $('drop-' + slot).classList.remove('hidden');
+    });
+    update();
+    toast('已重設');
+  });
+
+  $('btn-export').addEventListener('click', function () {
+    if (!state.diffCanvas) { toast('還沒有可匯出的差異圖'); return; }
+    state.diffCanvas.toBlob(function (blob) {
+      if (!blob) { toast('匯出失敗'); return; }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'image-diff-' + new Date().toISOString().slice(0, 10) + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast('已開始下載 ' + a.download);
+    }, 'image/png');
+  });
+
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  syncFields();
+  update();
+})();
+</script>
+</body>
+</html>
