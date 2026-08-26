@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>色彩工具組</title>
+  <meta name="description" content="WCAG 對比檢查與自動修正、HEX/RGB/HSL/OKLCH 格式互轉、感知均勻色階與配色產生、圖片取色，並可套用色覺模擬濾鏡。全部在瀏覽器完成。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 18px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Color bar ── */
+    .colorbar {
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+      padding: 14px; margin-bottom: 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .slot { display: flex; align-items: center; gap: 9px; }
+    .slot__label {
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500);
+      white-space: nowrap;
+    }
+    .swatch {
+      width: 40px; height: 40px; flex: 0 0 auto; padding: 0;
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      cursor: pointer; overflow: hidden;
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 12px 12px; background-position: 0 0, 6px 6px;
+    }
+    .swatch input[type="color"] {
+      width: 200%; height: 200%; margin: -25%; padding: 0; border: 0; cursor: pointer; background: none;
+    }
+    .hexinput {
+      width: 106px;
+      font-family: var(--al-font-mono); font-size: 13px; text-transform: uppercase;
+      color: var(--al-ink); background: var(--al-white);
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      padding: 7px 9px; outline: none;
+    }
+    .hexinput:focus { border-color: var(--al-accent); }
+    .hexinput.is-bad { border-color: var(--al-error-text); background: var(--al-error-bg); }
+    .colorbar__spacer { flex: 1 1 auto; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); white-space: nowrap; }
+    select, input[type="number"], input[type="text"] {
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+      background: var(--al-white); border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md); padding: 6px 8px; outline: none;
+    }
+    select:focus, input:focus { border-color: var(--al-accent); }
+    input[type="range"] { width: 130px; accent-color: var(--al-accent); }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .tab {
+      padding: 8px 14px;
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-slate-700);
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-full);
+      cursor: pointer;
+    }
+    .tab:hover { border-color: var(--al-accent); color: var(--al-accent); }
+    .tab.is-active { background: var(--al-accent); border-color: var(--al-accent); color: var(--al-white); }
+
+    /* ── Panel ── */
+    .panel {
+      padding: 18px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .panel__title {
+      font-family: var(--al-font-body); font-size: 11px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--al-slate-400);
+      margin: 0 0 10px;
+    }
+    .panel__section + .panel__section { margin-top: 22px; }
+
+    /* ── Contrast module ── */
+    .contrast-top { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 780px) { .contrast-top { grid-template-columns: 1fr; } }
+
+    .ratio {
+      text-align: center; padding: 18px 14px;
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-lg);
+      background: var(--al-bg-alt);
+    }
+    .ratio__value {
+      font-family: var(--al-font-mono); font-size: 40px; font-weight: 700; line-height: 1;
+      color: var(--al-ink);
+    }
+    .ratio__unit { font-family: var(--al-font-mono); font-size: 18px; color: var(--al-slate-400); }
+    .ratio__sub { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); margin-top: 8px; }
+
+    .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 14px; }
+    .check-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 11px;
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      font-family: var(--al-font-body); font-size: 12.5px;
+    }
+    .check-row.is-pass { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .check-row.is-fail { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .check-row__mark { font-size: 14px; font-weight: 700; }
+    .check-row__req { margin-left: auto; font-family: var(--al-font-mono); font-size: 11px; opacity: .8; }
+
+    .preview-card {
+      padding: 22px; border-radius: var(--al-radius-lg);
+      border: 1px solid var(--al-border);
+      min-height: 100%;
+    }
+    .preview-card h4 { font-family: var(--al-font-display); font-size: 24px; margin: 0 0 10px; font-weight: 800; }
+    .preview-card p { font-family: var(--al-font-body); font-size: 15px; line-height: 1.7; margin: 0 0 10px; }
+    .preview-card small { font-family: var(--al-font-body); font-size: 12px; line-height: 1.6; display: block; }
+    .preview-card .btnish {
+      display: inline-block; margin-top: 12px; padding: 8px 16px;
+      border-radius: var(--al-radius-md); font-family: var(--al-font-body); font-size: 13px; font-weight: 600;
+    }
+
+    .fix-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+    .fix-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 11px; cursor: pointer;
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      background: var(--al-white);
+      font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700);
+    }
+    .fix-chip:hover { border-color: var(--al-accent); }
+    .fix-chip__dot { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); }
+
+    /* ── Format module ── */
+    .formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+    .fmt {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      background: var(--al-bg-alt);
+    }
+    .fmt__name {
+      font-family: var(--al-font-body); font-size: 11px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--al-slate-400);
+      min-width: 56px;
+    }
+    .fmt__value {
+      flex: 1 1 auto; min-width: 0;
+      font-family: var(--al-font-mono); font-size: 12.5px; color: var(--al-slate-700);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .fmt__copy {
+      flex: 0 0 auto; padding: 3px 9px; cursor: pointer;
+      font-family: var(--al-font-body); font-size: 11px; color: var(--al-slate-500);
+      background: var(--al-white); border: 1px solid var(--al-border); border-radius: var(--al-radius-sm);
+    }
+    .fmt__copy:hover { color: var(--al-accent); border-color: var(--al-accent); }
+
+    /* ── Scale module ── */
+    .scale { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+    @media (max-width: 820px) { .scale { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+    @media (max-width: 480px) { .scale { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .step {
+      border-radius: var(--al-radius-sm); overflow: hidden; cursor: pointer;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .step__chip { height: 56px; display: flex; align-items: center; justify-content: center; }
+    .step__chip span { font-family: var(--al-font-mono); font-size: 10px; font-weight: 700; }
+    .step__meta {
+      padding: 5px 4px; text-align: center; background: var(--al-white);
+      font-family: var(--al-font-mono); font-size: 9.5px; color: var(--al-slate-500);
+      line-height: 1.35;
+    }
+
+    .harmony { display: flex; flex-wrap: wrap; gap: 10px; }
+    .harmony__item { text-align: center; cursor: pointer; }
+    .harmony__chip {
+      width: 74px; height: 56px; border-radius: var(--al-radius-md);
+      border: 1px solid rgba(0,0,0,.1);
+    }
+    .harmony__label {
+      font-family: var(--al-font-body); font-size: 11px; color: var(--al-slate-500); margin-top: 4px;
+    }
+    .harmony__hex { font-family: var(--al-font-mono); font-size: 10.5px; color: var(--al-slate-400); }
+
+    /* ── Image module ── */
+    .dropzone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; min-height: 130px; padding: 20px; cursor: pointer;
+      border: 2px dashed var(--al-border); border-radius: var(--al-radius-lg);
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-slate-500);
+      text-align: center;
+    }
+    .dropzone:hover, .dropzone.is-dragging {
+      background: var(--al-accent-soft); border-color: var(--al-accent); color: var(--al-accent);
+    }
+    .extract { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+    @media (max-width: 700px) { .extract { grid-template-columns: 1fr; } }
+    .extract__thumb {
+      width: 100%; border-radius: var(--al-radius-md); border: 1px solid var(--al-border); display: block;
+    }
+    .palette { display: flex; flex-wrap: wrap; gap: 8px; }
+    .palette__item { cursor: pointer; text-align: center; }
+    .palette__chip {
+      width: 82px; height: 62px; border-radius: var(--al-radius-md);
+      border: 1px solid rgba(0,0,0,.1);
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;
+    }
+    .palette__chip span { font-family: var(--al-font-mono); font-size: 9.5px; font-weight: 700; }
+    .palette__pct { font-family: var(--al-font-body); font-size: 10.5px; color: var(--al-slate-400); margin-top: 3px; }
+
+    .note {
+      margin-top: 12px; padding: 9px 12px;
+      border-left: 3px solid var(--al-accent-border);
+      background: var(--al-accent-soft);
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-700); line-height: 1.6;
+    }
+    .note code { font-family: var(--al-font-mono); font-size: 11.5px; }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 14px; padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 50; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .hidden { display: none !important; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>色彩工具組</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+    </div>
+    <p>WCAG 對比檢查與自動修正、格式互轉、感知均勻色階與配色、圖片取色，並可整組套上色覺模擬濾鏡。所有色彩運算都在你的瀏覽器裡完成。</p>
+  </header>
+
+  <div class="colorbar">
+    <div class="slot">
+      <span class="slot__label">前景</span>
+      <label class="swatch"><input type="color" id="fg-picker" value="#4F46E5" aria-label="前景色選擇器" /></label>
+      <input type="text" class="hexinput" id="fg-hex" value="#4F46E5" aria-label="前景色十六進位值" spellcheck="false" />
+    </div>
+
+    <div class="slot">
+      <span class="slot__label">背景</span>
+      <label class="swatch"><input type="color" id="bg-picker" value="#F5F4F0" aria-label="背景色選擇器" /></label>
+      <input type="text" class="hexinput" id="bg-hex" value="#F5F4F0" aria-label="背景色十六進位值" spellcheck="false" />
+    </div>
+
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-swap" type="button">對調</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-random" type="button">隨機</button>
+
+    <div class="colorbar__spacer"></div>
+
+    <div class="field">
+      <label for="cvd">色覺模擬</label>
+      <select id="cvd" title="以 Viénot–Brettel–Mollon (1999) 二色視模型模擬，套用到本頁所有色塊">
+        <option value="none">一般色覺</option>
+        <option value="protan">紅色盲 Protanopia</option>
+        <option value="deutan">綠色盲 Deuteranopia</option>
+        <option value="tritan">藍色盲 Tritanopia</option>
+      </select>
+    </div>
+  </div>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="功能模組"></nav>
+
+  <div class="panel" id="panel" role="tabpanel"></div>
+
+  <div class="statusbar" id="status" role="status" aria-live="polite"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     零第三方相依。所有色彩數學都在本檔內實作：
+
+     - WCAG 2.x 相對亮度與對比比值
+       L = 0.2126R + 0.7152G + 0.0722B，通道先以 sRGB 反伽瑪
+       （c <= 0.03928 ? c/12.92 : ((c+0.055)/1.055)^2.4）線性化；
+       比值 = (L_亮 + 0.05) / (L_暗 + 0.05)，範圍 1:1 ~ 21:1。
+       門檻：AA 內文 4.5、AA 大字 3、AAA 內文 7、AAA 大字 4.5、
+       非文字（UI 元件與圖形）3。
+
+     - OKLab / OKLCH 使用 Björn Ottosson (2020) 的參考係數。
+       色階與配色都在 OKLCH 上做，明度階梯才會在視覺上均勻。
+
+     - 色覺模擬使用 Viénot, Brettel & Mollon (1999) 的二色視矩陣，
+       套用在線性 RGB 上。三個矩陣每列係數和皆為 1，因此灰階不變；
+       紅綠型的前兩列相同，代表 R/G 兩軸塌陷。
+       注意這模擬的是「完全二色視」，不是程度較輕的異常三色視。
+
+     ── 要新增一個模組，在 MODULES 陣列加一個物件即可 ──
+     {
+       id:     唯一識別，用於分頁按鈕
+       label:  分頁名稱
+       render: (container, state) => void
+               每次色彩、色覺濾鏡或分頁變動時都會重新呼叫，
+               container 已清空，直接把內容塞進去即可。
+     }
+     共用狀態在 state：{ fg, bg, cvd }，色彩為 {r,g,b} 0-255。
+     改色請呼叫 setColor('fg'|'bg', rgb)，會自動重繪全部。
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var state = {
+    fg: { r: 0x4F, g: 0x46, b: 0xE5 },
+    bg: { r: 0xF5, g: 0xF4, b: 0xF0 },
+    cvd: 'none'
+  };
+
+  /* ── 基本轉換 ───────────────────────────────────────────── */
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function clamp255(v) { return clamp(Math.round(v), 0, 255); }
+
+  function parseHex(str) {
+    var s = String(str).trim().replace(/^#/, '');
+    if (/^[0-9a-fA-F]{3}$/.test(s)) {
+      s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+    }
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return {
+      r: parseInt(s.slice(0, 2), 16),
+      g: parseInt(s.slice(2, 4), 16),
+      b: parseInt(s.slice(4, 6), 16)
+    };
+  }
+
+  function toHex(c) {
+    return '#' + [c.r, c.g, c.b].map(function (v) {
+      return clamp255(v).toString(16).padStart(2, '0');
+    }).join('').toUpperCase();
+  }
+
+  function cssRgb(c) { return 'rgb(' + clamp255(c.r) + ' ' + clamp255(c.g) + ' ' + clamp255(c.b) + ')'; }
+
+  /* sRGB <-> linear */
+  function toLinear(c8) {
+    var c = c8 / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function fromLinear(l) {
+    var c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055;
+    return c * 255;
+  }
+
+  /* ── WCAG ───────────────────────────────────────────────── */
+
+  function luminance(c) {
+    return 0.2126 * toLinear(c.r) + 0.7152 * toLinear(c.g) + 0.0722 * toLinear(c.b);
+  }
+
+  function contrast(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    var hi = Math.max(la, lb), lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  /* ── HSL ────────────────────────────────────────────────── */
+
+  function rgbToHsl(c) {
+    var r = c.r / 255, g = c.g / 255, b = c.b / 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h = 0, s = 0, l = (max + min) / 2;
+    var d = max - min;
+    if (d) {
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0));
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return { h: h, s: s * 100, l: l * 100 };
+  }
+
+  /* ── OKLab / OKLCH（Ottosson 2020 參考係數） ────────────── */
+
+  function linearToOklab(lr, lg, lb) {
+    var l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+    var m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+    var s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+
+    var l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+
+    return {
+      L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+      a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    };
+  }
+
+  function oklabToLinear(L, a, b) {
+    var l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+    var m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+    var s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+    var l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
+
+    return {
+      r: +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      b: -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+    };
+  }
+
+  function rgbToOklch(c) {
+    var o = linearToOklab(toLinear(c.r), toLinear(c.g), toLinear(c.b));
+    var C = Math.sqrt(o.a * o.a + o.b * o.b);
+    var H = C < 1e-7 ? 0 : (Math.atan2(o.b, o.a) * 180 / Math.PI + 360) % 360;
+    return { L: o.L, C: C, H: H };
+  }
+
+  function oklchToRgbRaw(L, C, H) {
+    var rad = H * Math.PI / 180;
+    return oklabToLinear(L, C * Math.cos(rad), C * Math.sin(rad));
+  }
+
+  function inGamut(lin) {
+    var eps = 1e-4;
+    return lin.r >= -eps && lin.r <= 1 + eps &&
+           lin.g >= -eps && lin.g <= 1 + eps &&
+           lin.b >= -eps && lin.b <= 1 + eps;
+  }
+
+  // 超出 sRGB 色域時逐步降低彩度，保住色相與明度
+  function oklchToRgb(L, C, H) {
+    var lin = oklchToRgbRaw(L, C, H);
+    if (!inGamut(lin)) {
+      var lo = 0, hi = C;
+      for (var i = 0; i < 22; i++) {
+        var mid = (lo + hi) / 2;
+        if (inGamut(oklchToRgbRaw(L, mid, H))) lo = mid; else hi = mid;
+      }
+      lin = oklchToRgbRaw(L, lo, H);
+    }
+    return {
+      r: clamp255(fromLinear(clamp(lin.r, 0, 1))),
+      g: clamp255(fromLinear(clamp(lin.g, 0, 1))),
+      b: clamp255(fromLinear(clamp(lin.b, 0, 1)))
+    };
+  }
+
+  /* ── 色覺模擬（Viénot, Brettel & Mollon 1999，線性 RGB） ─── */
+
+  var CVD = {
+    protan: [[0.170556992, 0.829443014, 0], [0.170556991, 0.829443008, 0], [-0.004517144, 0.004517144, 1]],
+    deutan: [[0.33066007, 0.66933993, 0], [0.33066007, 0.66933993, 0], [-0.02785538, 0.02785538, 1]],
+    tritan: [[1, 0.1273989, -0.1273989], [0, 0.8739093, 0.1260907], [0, 0.8739093, 0.1260907]]
+  };
+
+  function simulate(c) {
+    var m = CVD[state.cvd];
+    if (!m) return c;
+    var lr = toLinear(c.r), lg = toLinear(c.g), lb = toLinear(c.b);
+    return {
+      r: clamp255(fromLinear(clamp(m[0][0] * lr + m[0][1] * lg + m[0][2] * lb, 0, 1))),
+      g: clamp255(fromLinear(clamp(m[1][0] * lr + m[1][1] * lg + m[1][2] * lb, 0, 1))),
+      b: clamp255(fromLinear(clamp(m[2][0] * lr + m[2][1] * lg + m[2][2] * lb, 0, 1)))
+    };
+  }
+
+  /* 顯示用顏色：套過色覺濾鏡 */
+  function shown(c) { return cssRgb(simulate(c)); }
+
+  /* 在某個底色上該用黑字還是白字 */
+  function readableInk(c) {
+    return contrast(c, { r: 0, g: 0, b: 0 }) >= contrast(c, { r: 255, g: 255, b: 255 })
+      ? '#000000' : '#FFFFFF';
+  }
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('is-on'); }, 1700);
+  }
+
+  function setStatus(html, kind) {
+    $('status').className = 'statusbar' + (kind ? ' is-' + kind : '');
+    $('status').innerHTML = html;
+  }
+
+  function copy(text) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      toast(ok ? '已複製 ' + text : '此環境不允許自動複製');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('已複製 ' + text); }, fallback);
+    } else { fallback(); }
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     模組 1：對比檢查
+     ══════════════════════════════════════════════════════════ */
+
+  var WCAG_RULES = [
+    { key: 'aa-normal',  label: 'AA 內文',   req: 4.5, note: '一般大小的文字' },
+    { key: 'aa-large',   label: 'AA 大字',   req: 3,   note: '18pt 以上，或 14pt 粗體以上' },
+    { key: 'aaa-normal', label: 'AAA 內文',  req: 7,   note: '一般大小的文字' },
+    { key: 'aaa-large',  label: 'AAA 大字',  req: 4.5, note: '18pt 以上，或 14pt 粗體以上' },
+    { key: 'nontext',    label: '非文字元件', req: 3,   note: '按鈕邊框、圖示、圖表等' }
+  ];
+
+  function renderContrast(root) {
+    var ratio = contrast(state.fg, state.bg);
+    var simRatio = state.cvd === 'none' ? null : contrast(simulate(state.fg), simulate(state.bg));
+
+    var top = el('div', 'contrast-top');
+
+    /* 左：比值與判定 */
+    var left = el('div');
+    var box = el('div', 'ratio');
+    var val = el('div', 'ratio__value');
+    val.textContent = ratio.toFixed(2);
+    var unit = el('span', 'ratio__unit', ' : 1');
+    val.appendChild(unit);
+    box.appendChild(val);
+    box.appendChild(el('div', 'ratio__sub', '可能範圍 1:1 到 21:1'));
+    left.appendChild(box);
+
+    var checks = el('div', 'checks');
+    WCAG_RULES.forEach(function (rule) {
+      var pass = ratio >= rule.req;
+      var row = el('div', 'check-row ' + (pass ? 'is-pass' : 'is-fail'));
+      row.title = rule.note;
+      row.appendChild(el('span', 'check-row__mark', pass ? '✓' : '✕'));
+      row.appendChild(el('span', '', rule.label));
+      row.appendChild(el('span', 'check-row__req', '≥ ' + rule.req));
+      checks.appendChild(row);
+    });
+    left.appendChild(checks);
+    top.appendChild(left);
+
+    /* 右：實際文字預覽 */
+    var card = el('div', 'preview-card');
+    card.style.background = shown(state.bg);
+    card.style.color = shown(state.fg);
+    var h = el('h4', '', '這是標題文字');
+    var p = el('p', '', '這是一段內文，用來看實際排版下的可讀性。The quick brown fox jumps over the lazy dog. 0123456789');
+    var s = el('small', '', '這是說明文字，尺寸更小，對比不足時通常最先出問題。');
+    var btn = el('span', 'btnish', '按鈕樣式');
+    btn.style.background = shown(state.fg);
+    btn.style.color = shown(state.bg);
+    card.appendChild(h); card.appendChild(p); card.appendChild(s); card.appendChild(btn);
+    top.appendChild(card);
+
+    root.appendChild(top);
+
+    /* 自動修正建議 */
+    var fixSection = el('div', 'panel__section');
+    fixSection.appendChild(el('h3', 'panel__title', '自動修正 — 保留色相與彩度，只調整明度'));
+
+    var fixes = el('div', 'fix-row');
+    [
+      { label: 'AA 內文 4.5', target: 4.5 },
+      { label: 'AAA 內文 7', target: 7 },
+      { label: '非文字 3', target: 3 }
+    ].forEach(function (goal) {
+      var fixed = findPassingColor(state.fg, state.bg, goal.target);
+      var chip = el('button', 'fix-chip');
+      chip.type = 'button';
+      var dot = el('span', 'fix-chip__dot');
+      if (fixed) {
+        dot.style.background = shown(fixed);
+        chip.appendChild(dot);
+        chip.appendChild(el('span', '', goal.label + ' → ' + toHex(fixed) +
+          '（' + contrast(fixed, state.bg).toFixed(2) + ':1）'));
+        chip.addEventListener('click', function () {
+          setColor('fg', fixed);
+          toast('前景已改為 ' + toHex(fixed));
+        });
+      } else {
+        chip.disabled = true;
+        chip.style.opacity = '.5';
+        chip.appendChild(el('span', '', goal.label + ' → 這個背景做不到'));
+      }
+      fixes.appendChild(chip);
+    });
+    fixSection.appendChild(fixes);
+
+    var note = el('div', 'note');
+    note.innerHTML = '修正是在 OKLCH 上二分搜尋明度得到的，所以色相不會跑掉。' +
+      '若背景本身是中明度（例如中灰），高對比目標可能無論如何都達不到，此時要改的是背景。';
+    fixSection.appendChild(note);
+    root.appendChild(fixSection);
+
+    /* 色覺模擬下的比值 */
+    if (simRatio !== null) {
+      var cvdSection = el('div', 'panel__section');
+      cvdSection.appendChild(el('h3', 'panel__title', '色覺模擬下的對比'));
+      var diff = el('div', 'note');
+      diff.innerHTML = '在目前選擇的色覺模擬下，這組配色的對比比值為 <code>' + simRatio.toFixed(2) +
+        ':1</code>（一般色覺為 <code>' + ratio.toFixed(2) + ':1</code>）。' +
+        '亮度對比通常變化不大——色覺缺陷影響的主要是色相辨識，' +
+        '所以<strong>不要只靠顏色傳達資訊</strong>，同時用形狀、圖示或文字標示。';
+      cvdSection.appendChild(diff);
+      root.appendChild(cvdSection);
+    }
+
+    var kind = ratio >= 7 ? 'ok' : (ratio >= 4.5 ? 'ok' : (ratio >= 3 ? 'warn' : 'error'));
+    var verdict = ratio >= 7 ? '通過 AAA 內文標準'
+                : ratio >= 4.5 ? '通過 AA 內文標準，未達 AAA'
+                : ratio >= 3 ? '只夠大字與非文字元件，一般內文不合格'
+                : '對比不足，連非文字元件的 3:1 都沒到';
+    setStatus('對比 <code>' + ratio.toFixed(2) + ':1</code> — ' + verdict + '。', kind);
+  }
+
+  /* 在 OKLCH 上二分搜尋明度，找出最接近原色又達標的顏色 */
+  function findPassingColor(fg, bg, target) {
+    if (contrast(fg, bg) >= target) return null;
+
+    var base = rgbToOklch(fg);
+    var bgLum = luminance(bg);
+
+    // 背景偏亮就把前景壓暗，反之提亮
+    var goDark = bgLum > 0.18;
+    var lo = goDark ? 0 : base.L;
+    var hi = goDark ? base.L : 1;
+
+    var endpoint = oklchToRgb(goDark ? 0 : 1, base.C, base.H);
+    if (contrast(endpoint, bg) < target) return null;   // 這個方向到極限也達不到
+
+    var best = endpoint;
+    for (var i = 0; i < 30; i++) {
+      var mid = (lo + hi) / 2;
+      var cand = oklchToRgb(mid, base.C, base.H);
+      if (contrast(cand, bg) >= target) {
+        best = cand;
+        // 往回靠近原色
+        if (goDark) lo = mid; else hi = mid;
+      } else {
+        if (goDark) hi = mid; else lo = mid;
+      }
+    }
+    return best;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     模組 2：格式轉換
+     ══════════════════════════════════════════════════════════ */
+
+  function renderFormats(root) {
+    ['fg', 'bg'].forEach(function (slot) {
+      var c = state[slot];
+      var hsl = rgbToHsl(c);
+      var lch = rgbToOklch(c);
+
+      var section = el('div', 'panel__section');
+      section.appendChild(el('h3', 'panel__title', (slot === 'fg' ? '前景' : '背景') + ' ' + toHex(c)));
+
+      var grid = el('div', 'formats');
+      [
+        ['HEX', toHex(c)],
+        ['RGB', 'rgb(' + c.r + ' ' + c.g + ' ' + c.b + ')'],
+        ['RGB %', 'rgb(' + (c.r / 255 * 100).toFixed(1) + '% ' + (c.g / 255 * 100).toFixed(1) + '% ' + (c.b / 255 * 100).toFixed(1) + '%)'],
+        ['HSL', 'hsl(' + hsl.h.toFixed(1) + ' ' + hsl.s.toFixed(1) + '% ' + hsl.l.toFixed(1) + '%)'],
+        ['OKLCH', 'oklch(' + (lch.L * 100).toFixed(1) + '% ' + lch.C.toFixed(4) + ' ' + lch.H.toFixed(1) + ')'],
+        ['亮度 L', luminance(c).toFixed(4) + '（WCAG 相對亮度）']
+      ].forEach(function (pair) {
+        var row = el('div', 'fmt');
+        row.appendChild(el('span', 'fmt__name', pair[0]));
+        var v = el('span', 'fmt__value', pair[1]);
+        v.title = pair[1];
+        row.appendChild(v);
+        var btn = el('button', 'fmt__copy', '複製');
+        btn.type = 'button';
+        btn.addEventListener('click', function () { copy(pair[1]); });
+        row.appendChild(btn);
+        grid.appendChild(row);
+      });
+      section.appendChild(grid);
+      root.appendChild(section);
+    });
+
+    var note = el('div', 'note');
+    note.innerHTML = 'OKLCH 是感知均勻的色彩空間（Björn Ottosson, 2020）：明度改動相同的量，' +
+      '看起來的變化程度也相近，因此比 HSL 更適合做色階。超出 sRGB 色域時本工具會逐步降低彩度，' +
+      '保住色相與明度。';
+    root.appendChild(note);
+
+    setStatus('前景 <code>' + toHex(state.fg) + '</code> · 背景 <code>' + toHex(state.bg) +
+              '</code> — 點任一列的「複製」即可取用。');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     模組 3：色階與配色
+     ══════════════════════════════════════════════════════════ */
+
+  var SCALE_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  // 對應的 OKLCH 明度，端點接近白與近黑
+  var SCALE_L = [0.97, 0.94, 0.87, 0.79, 0.70, 0.62, 0.54, 0.45, 0.37, 0.29, 0.22];
+
+  function renderScale(root) {
+    var base = rgbToOklch(state.fg);
+
+    var s1 = el('div', 'panel__section');
+    s1.appendChild(el('h3', 'panel__title', '色階 — 以前景色為基準，在 OKLCH 明度上均勻取樣'));
+
+    var scale = el('div', 'scale');
+    SCALE_STEPS.forEach(function (step, i) {
+      var L = SCALE_L[i];
+      // 端點降低彩度，避免最亮/最暗處看起來髒
+      var chromaScale = 1 - Math.pow(Math.abs(L - 0.62) / 0.45, 2) * 0.45;
+      var c = oklchToRgb(L, base.C * clamp(chromaScale, 0.25, 1), base.H);
+
+      var item = el('div', 'step');
+      var chip = el('div', 'step__chip');
+      chip.style.background = shown(c);
+      var lbl = el('span', '', String(step));
+      lbl.style.color = readableInk(c);
+      chip.appendChild(lbl);
+
+      var meta = el('div', 'step__meta');
+      var onWhite = contrast(c, { r: 255, g: 255, b: 255 });
+      var onBlack = contrast(c, { r: 0, g: 0, b: 0 });
+      meta.textContent = toHex(c);
+      meta.appendChild(document.createElement('br'));
+      meta.appendChild(document.createTextNode('W ' + onWhite.toFixed(1) + ' · B ' + onBlack.toFixed(1)));
+
+      item.appendChild(chip);
+      item.appendChild(meta);
+      item.title = '點擊設為前景色 — 對白底 ' + onWhite.toFixed(2) + ':1，對黑底 ' + onBlack.toFixed(2) + ':1';
+      item.addEventListener('click', function () { setColor('fg', c); toast('前景已改為 ' + toHex(c)); });
+      scale.appendChild(item);
+    });
+    s1.appendChild(scale);
+    s1.appendChild(Object.assign(el('div', 'note'), {
+      innerHTML: '每格下方的 <code>W</code> / <code>B</code> 是這個色對白底與黑底的對比比值，' +
+                 '可以直接看出哪幾階能安全承載文字（內文需 ≥ 4.5）。'
+    }));
+    root.appendChild(s1);
+
+    var s2 = el('div', 'panel__section');
+    s2.appendChild(el('h3', 'panel__title', '配色 — 在 OKLCH 上旋轉色相'));
+
+    var harmony = el('div', 'harmony');
+    [
+      { label: '基色', deg: 0 },
+      { label: '補色', deg: 180 },
+      { label: '類比 -30°', deg: -30 },
+      { label: '類比 +30°', deg: 30 },
+      { label: '三分 +120°', deg: 120 },
+      { label: '三分 -120°', deg: -120 },
+      { label: '分裂補色 +150°', deg: 150 },
+      { label: '分裂補色 -150°', deg: -150 }
+    ].forEach(function (h) {
+      var c = oklchToRgb(base.L, base.C, (base.H + h.deg + 360) % 360);
+      var item = el('div', 'harmony__item');
+      var chip = el('div', 'harmony__chip');
+      chip.style.background = shown(c);
+      item.appendChild(chip);
+      item.appendChild(el('div', 'harmony__label', h.label));
+      item.appendChild(el('div', 'harmony__hex', toHex(c)));
+      item.title = '點擊設為前景色';
+      item.addEventListener('click', function () { setColor('fg', c); toast('前景已改為 ' + toHex(c)); });
+      harmony.appendChild(item);
+    });
+    s2.appendChild(harmony);
+    root.appendChild(s2);
+
+    setStatus('色階與配色都以前景色 <code>' + toHex(state.fg) + '</code> 為基準，點任一色塊即可設為前景色。');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     模組 4：圖片取色
+     ══════════════════════════════════════════════════════════ */
+
+  var extracted = null;   // { thumbURL, palette: [{c, pct}] }
+
+  function renderExtract(root) {
+    var section = el('div', 'panel__section');
+    section.appendChild(el('h3', 'panel__title', '從圖片取出主要色彩'));
+
+    if (!extracted) {
+      var zone = el('div', 'dropzone');
+      zone.tabIndex = 0;
+      zone.setAttribute('role', 'button');
+      zone.appendChild(el('span', '', '點擊選擇圖片，或把圖片拖進來'));
+      zone.appendChild(el('span', '', '圖片只在本機解碼，不會上傳'));
+      zone.style.fontSize = '13px';
+
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.className = 'visually-hidden';
+      input.addEventListener('change', function () {
+        if (input.files && input.files[0]) extractFrom(input.files[0]);
+        input.value = '';
+      });
+
+      zone.addEventListener('click', function () { input.click(); });
+      zone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+      });
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('is-dragging'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); zone.classList.remove('is-dragging'); });
+      });
+      zone.addEventListener('drop', function (e) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) extractFrom(e.dataTransfer.files[0]);
+      });
+
+      section.appendChild(zone);
+      section.appendChild(input);
+      root.appendChild(section);
+      setStatus('丟一張圖片進來，會取出出現比例最高的幾個色彩。');
+      return;
+    }
+
+    var wrap = el('div', 'extract');
+    var img = document.createElement('img');
+    img.className = 'extract__thumb';
+    img.src = extracted.thumbURL;
+    img.alt = '來源圖片縮圖';
+    wrap.appendChild(img);
+
+    var right = el('div');
+    var palette = el('div', 'palette');
+    extracted.palette.forEach(function (entry) {
+      var item = el('div', 'palette__item');
+      var chip = el('div', 'palette__chip');
+      chip.style.background = shown(entry.c);
+      var lbl = el('span', '', toHex(entry.c));
+      lbl.style.color = readableInk(entry.c);
+      chip.appendChild(lbl);
+      item.appendChild(chip);
+      item.appendChild(el('div', 'palette__pct', entry.pct.toFixed(1) + '%'));
+      item.title = '點擊設為前景色';
+      item.addEventListener('click', function () { setColor('fg', entry.c); toast('前景已改為 ' + toHex(entry.c)); });
+      palette.appendChild(item);
+    });
+    right.appendChild(palette);
+
+    var again = el('button', 'al-btn al-btn--toolbar al-btn--secondary', '換一張圖片');
+    again.type = 'button';
+    again.style.marginTop = '14px';
+    again.addEventListener('click', function () {
+      if (extracted && extracted.thumbURL) URL.revokeObjectURL(extracted.thumbURL);
+      extracted = null;
+      renderPanel();
+    });
+    right.appendChild(again);
+
+    wrap.appendChild(right);
+    section.appendChild(wrap);
+    root.appendChild(section);
+
+    setStatus('取出 <code>' + extracted.palette.length + '</code> 個主要色彩，點任一色塊設為前景色後可切到「對比檢查」看它能不能承載文字。');
+  }
+
+  function extractFrom(file) {
+    if (!/^image\//.test(file.type)) {
+      setStatus('這不是圖片檔（收到的類型是 <code>' + (file.type || '未知') + '</code>）。', 'error');
+      return;
+    }
+    setStatus('正在解碼圖片…');
+
+    var decode = window.createImageBitmap
+      ? createImageBitmap(file)
+      : new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var im = new Image();
+          im.onload = function () { URL.revokeObjectURL(url); resolve(im); };
+          im.onerror = function () { URL.revokeObjectURL(url); reject(new Error('無法解碼')); };
+          im.src = url;
+        });
+
+    decode.then(function (bitmap) {
+      var W = bitmap.width, H = bitmap.height;
+      var scale = Math.min(1, 140 / Math.max(W, H));
+      var w = Math.max(1, Math.round(W * scale)), h = Math.max(1, Math.round(H * scale));
+
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      var data = ctx.getImageData(0, 0, w, h).data;
+
+      // 以 4 bit/通道分桶統計出現次數，再取代表色
+      var buckets = {};
+      var counted = 0;
+      for (var i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 125) continue;             // 略過大致透明的像素
+        var key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+        var b = buckets[key] || (buckets[key] = { n: 0, r: 0, g: 0, b: 0 });
+        b.n++; b.r += data[i]; b.g += data[i + 1]; b.b += data[i + 2];
+        counted++;
+      }
+
+      var list = Object.keys(buckets).map(function (k) {
+        var b = buckets[k];
+        return { c: { r: Math.round(b.r / b.n), g: Math.round(b.g / b.n), b: Math.round(b.b / b.n) }, n: b.n };
+      }).sort(function (x, y) { return y.n - x.n; });
+
+      // 濾掉與已選色太接近的桶，避免整排都是同一個色
+      var picked = [];
+      for (var j = 0; j < list.length && picked.length < 8; j++) {
+        var cand = list[j];
+        var tooClose = picked.some(function (p) {
+          var a = rgbToOklch(p.c), bq = rgbToOklch(cand.c);
+          var dL = a.L - bq.L;
+          var dH = Math.min(Math.abs(a.H - bq.H), 360 - Math.abs(a.H - bq.H)) / 360;
+          var dC = a.C - bq.C;
+          return Math.abs(dL) < 0.08 && dH < 0.06 && Math.abs(dC) < 0.05;
+        });
+        if (!tooClose) picked.push(cand);
+      }
+
+      var thumbCanvas = document.createElement('canvas');
+      var ts = Math.min(1, 400 / Math.max(W, H));
+      thumbCanvas.width = Math.max(1, Math.round(W * ts));
+      thumbCanvas.height = Math.max(1, Math.round(H * ts));
+      thumbCanvas.getContext('2d').drawImage(bitmap, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+      thumbCanvas.toBlob(function (blob) {
+        extracted = {
+          thumbURL: URL.createObjectURL(blob),
+          palette: picked.map(function (p) { return { c: p.c, pct: p.n / counted * 100 }; })
+        };
+        renderPanel();
+      }, 'image/png');
+    }).catch(function (e) {
+      setStatus('解碼圖片失敗：' + ((e && e.message) || String(e)), 'error');
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     模組註冊表
+     ══════════════════════════════════════════════════════════ */
+
+  var MODULES = [
+    { id: 'contrast', label: '對比檢查', render: renderContrast },
+    { id: 'formats',  label: '格式轉換', render: renderFormats },
+    { id: 'scale',    label: '色階與配色', render: renderScale },
+    { id: 'extract',  label: '圖片取色', render: renderExtract }
+  ];
+
+  var activeModule = MODULES[0].id;
+
+  function buildTabs() {
+    var tabs = $('tabs');
+    tabs.innerHTML = '';
+    MODULES.forEach(function (m) {
+      var b = el('button', 'tab' + (m.id === activeModule ? ' is-active' : ''), m.label);
+      b.type = 'button';
+      b.dataset.module = m.id;
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', m.id === activeModule ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        activeModule = m.id;
+        buildTabs();
+        renderPanel();
+      });
+      tabs.appendChild(b);
+    });
+  }
+
+  function renderPanel() {
+    var panel = $('panel');
+    panel.innerHTML = '';
+    var m = MODULES.filter(function (x) { return x.id === activeModule; })[0] || MODULES[0];
+    try {
+      m.render(panel, state);
+    } catch (e) {
+      panel.innerHTML = '';
+      setStatus('模組「' + m.label + '」渲染失敗：' + ((e && e.message) || String(e)), 'error');
+    }
+  }
+
+  /* ── 色彩狀態 ───────────────────────────────────────────── */
+
+  function setColor(slot, rgb, skipInputs) {
+    state[slot] = { r: clamp255(rgb.r), g: clamp255(rgb.g), b: clamp255(rgb.b) };
+    if (!skipInputs) {
+      $(slot + '-hex').value = toHex(state[slot]);
+      $(slot + '-hex').classList.remove('is-bad');
+      $(slot + '-picker').value = toHex(state[slot]);
+    }
+    renderPanel();
+  }
+
+  ['fg', 'bg'].forEach(function (slot) {
+    $(slot + '-picker').addEventListener('input', function () {
+      var c = parseHex(this.value);
+      if (c) setColor(slot, c);
+    });
+    $(slot + '-hex').addEventListener('input', function () {
+      var c = parseHex(this.value);
+      if (c) {
+        this.classList.remove('is-bad');
+        $(slot + '-picker').value = toHex(c);
+        state[slot] = c;
+        renderPanel();
+      } else {
+        this.classList.add('is-bad');
+      }
+    });
+    $(slot + '-hex').addEventListener('blur', function () {
+      var c = parseHex(this.value);
+      if (!c) {
+        this.value = toHex(state[slot]);
+        this.classList.remove('is-bad');
+      } else {
+        this.value = toHex(c);
+      }
+    });
+  });
+
+  $('btn-swap').addEventListener('click', function () {
+    var t = state.fg;
+    setColor('fg', state.bg);
+    setColor('bg', t);
+    toast('已對調前景與背景');
+  });
+
+  $('btn-random').addEventListener('click', function () {
+    function rnd() { return Math.floor(Math.random() * 256); }
+    setColor('fg', { r: rnd(), g: rnd(), b: rnd() });
+    setColor('bg', { r: rnd(), g: rnd(), b: rnd() });
+  });
+
+  $('cvd').addEventListener('change', function () {
+    state.cvd = this.value;
+    renderPanel();
+  });
+
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + (e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  buildTabs();
+  renderPanel();
+})();
+</script>
+</body>
+</html>

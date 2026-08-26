@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>編碼／雜湊工具箱</title>
+  <meta name="description" content="Base64、URL、HTML 實體、Unicode、Hex 編解碼，SHA 雜湊與 HMAC，JWT 解碼、UUID 與隨機密碼產生。全部在瀏覽器完成，資料不會上傳。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 20px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+    @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+    /* ── Operation list ── */
+    .ops {
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+      position: sticky; top: 20px;
+    }
+    @media (max-width: 880px) { .ops { position: static; } }
+    .ops__search { padding: 10px; border-bottom: 1px solid var(--al-border-soft); background: var(--al-bg-alt); }
+    .ops__search input {
+      width: 100%;
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+      background: var(--al-white); border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md); padding: 7px 9px; outline: none;
+    }
+    .ops__search input:focus { border-color: var(--al-accent); }
+    .ops__list { max-height: 60vh; overflow: auto; padding: 6px; }
+    @media (max-width: 880px) { .ops__list { max-height: 320px; } }
+    .ops__group {
+      font-family: var(--al-font-body); font-size: 10.5px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--al-slate-400);
+      padding: 10px 8px 5px;
+    }
+    .op {
+      display: block; width: 100%; text-align: left;
+      padding: 7px 9px; margin-bottom: 1px;
+      font-family: var(--al-font-body); font-size: 12.5px; color: var(--al-slate-700);
+      background: transparent; border: 0; border-radius: var(--al-radius-sm);
+      cursor: pointer;
+    }
+    .op:hover { background: var(--al-accent-soft); color: var(--al-accent); }
+    .op.is-active { background: var(--al-accent); color: var(--al-white); }
+    .op__hint { display: block; font-size: 10.5px; opacity: .72; margin-top: 1px; }
+    .ops__empty {
+      padding: 18px 10px; text-align: center;
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-400);
+    }
+
+    /* ── Work area ── */
+    .work { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      padding: 12px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .toolbar__spacer { flex: 1 1 auto; }
+    .toolbar__title {
+      font-family: var(--al-font-body); font-size: 13.5px; font-weight: 600; color: var(--al-ink);
+    }
+    .toolbar__desc {
+      flex-basis: 100%;
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); line-height: 1.55;
+    }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); white-space: nowrap; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+      background: var(--al-white); border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md); padding: 6px 8px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--al-accent); }
+    input[type="text"], input[type="password"] { width: 200px; }
+    input[type="number"] { width: 82px; }
+    .check { display: flex; align-items: center; gap: 6px; font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); cursor: pointer; }
+    .check input { accent-color: var(--al-accent); }
+    .hidden { display: none !important; }
+
+    .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 1000px) { .panes { grid-template-columns: 1fr; } }
+
+    .pane {
+      display: flex; flex-direction: column; min-width: 0; position: relative;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    .pane__head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--al-bg-alt);
+      border-bottom: 1px solid var(--al-border-soft);
+    }
+    .pane__title {
+      font-family: var(--al-font-body); font-size: 12px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--al-slate-700); margin: 0;
+    }
+    .pane__meta { font-family: var(--al-font-mono); font-size: 11px; color: var(--al-slate-400); margin-left: auto; }
+
+    textarea {
+      width: 100%; min-height: 260px; resize: vertical; flex: 1 1 auto;
+      font-family: var(--al-font-mono); font-size: 12.5px; line-height: 1.65;
+      color: var(--al-slate-700); background: var(--al-white);
+      border: 0; outline: none; padding: 14px; tab-size: 2;
+      word-break: break-all;
+    }
+    textarea[readonly] { background: #FCFCFA; }
+
+    .drop-hint {
+      position: absolute; inset: 0; z-index: 5;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(79,70,229,.06); border: 2px dashed var(--al-accent);
+      border-radius: var(--al-radius-lg);
+      font-family: var(--al-font-body); font-size: 14px; color: var(--al-accent);
+    }
+    .pane.is-dragging .drop-hint { display: flex; }
+
+    /* JWT 結構化輸出 */
+    .jwt { padding: 14px; overflow: auto; flex: 1 1 auto; }
+    .jwt__part { margin-bottom: 14px; }
+    .jwt__label {
+      font-family: var(--al-font-body); font-size: 11px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; margin-bottom: 5px;
+    }
+    .jwt__label--header { color: #B45309; }
+    .jwt__label--payload { color: #4F46E5; }
+    .jwt__label--sig { color: var(--al-slate-400); }
+    .jwt__body {
+      font-family: var(--al-font-mono); font-size: 12px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-all;
+      background: var(--al-bg-alt); border: 1px solid var(--al-border-soft);
+      border-radius: var(--al-radius-sm); padding: 10px;
+    }
+    .jwt__claims { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .jwt__claim {
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-700);
+      display: flex; gap: 8px; align-items: baseline;
+    }
+    .jwt__claim b { font-family: var(--al-font-mono); font-size: 11.5px; color: var(--al-slate-500); min-width: 44px; }
+    .jwt__claim.is-expired { color: var(--al-error-text); }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 50; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>編碼／雜湊工具箱</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+    </div>
+    <p>Base64、URL、HTML 實體、Unicode、Hex 編解碼，SHA 家族雜湊與 HMAC，外加 JWT 解碼與亂數產生器。所有運算都在你的瀏覽器裡完成——貼進來的權杖與密鑰不會離開這台電腦。</p>
+  </header>
+
+  <div class="layout">
+
+    <aside class="ops" aria-label="操作清單">
+      <div class="ops__search">
+        <input type="search" id="op-search" placeholder="搜尋操作…" aria-label="搜尋操作" autocomplete="off" />
+      </div>
+      <div class="ops__list" id="op-list" role="listbox" aria-label="可用操作"></div>
+    </aside>
+
+    <div class="work">
+
+      <div class="toolbar" role="toolbar" aria-label="目前操作">
+        <span class="toolbar__title" id="op-title">—</span>
+        <div class="field hidden" id="f-key">
+          <label for="hmac-key">密鑰</label>
+          <input type="password" id="hmac-key" placeholder="HMAC secret" autocomplete="off" />
+          <label class="check"><input type="checkbox" id="key-visible" /><span>顯示</span></label>
+        </div>
+        <div class="field hidden" id="f-length">
+          <label for="gen-length">長度</label>
+          <input type="number" id="gen-length" min="4" max="256" value="24" />
+        </div>
+        <div class="field hidden" id="f-charset">
+          <label class="check"><input type="checkbox" id="cs-upper" checked /><span>A-Z</span></label>
+          <label class="check"><input type="checkbox" id="cs-lower" checked /><span>a-z</span></label>
+          <label class="check"><input type="checkbox" id="cs-digit" checked /><span>0-9</span></label>
+          <label class="check"><input type="checkbox" id="cs-symbol" checked /><span>符號</span></label>
+          <label class="check" title="排除 0 O o 1 l I 這類容易看錯的字元"><input type="checkbox" id="cs-unambiguous" /><span>避免易混字</span></label>
+        </div>
+        <div class="toolbar__spacer"></div>
+        <button class="al-btn al-btn--toolbar al-btn--secondary hidden" id="btn-swap" type="button">套用反向操作</button>
+        <button class="al-btn al-btn--toolbar al-btn--secondary hidden" id="btn-run" type="button">重新產生</button>
+        <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-clear" type="button">清空</button>
+        <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-copy" type="button">複製結果</button>
+        <p class="toolbar__desc" id="op-desc"></p>
+      </div>
+
+      <div class="panes">
+        <section class="pane" id="pane-in" aria-label="輸入">
+          <div class="pane__head">
+            <h2 class="pane__title">輸入</h2>
+            <span class="pane__meta" id="in-meta">0 B</span>
+          </div>
+          <textarea id="input" spellcheck="false" autocomplete="off"
+                    placeholder="在這裡輸入或貼上內容，也可以把檔案拖進來"></textarea>
+          <div class="drop-hint" aria-hidden="true">放開以載入檔案</div>
+        </section>
+
+        <section class="pane" aria-label="輸出">
+          <div class="pane__head">
+            <h2 class="pane__title">輸出</h2>
+            <span class="pane__meta" id="out-meta"></span>
+          </div>
+          <textarea id="output" spellcheck="false" readonly placeholder="結果會出現在這裡"></textarea>
+          <div class="jwt hidden" id="jwt-view"></div>
+        </section>
+      </div>
+
+      <div class="statusbar" id="status" role="status" aria-live="polite">選一個操作開始。</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     零第三方相依：雜湊全部走原生 WebCrypto（crypto.subtle），
+     亂數走 crypto.getRandomValues，不使用 localStorage、
+     同源 fetch 或外部 worker，因此在大廳的預覽沙箱
+     （sandbox="allow-scripts allow-forms"，不透明來源）中一樣可用。
+
+     ── 要新增一個操作，只要在 OPS 陣列裡加一個物件 ──
+     {
+       id:       唯一識別，也是 inverse 的參照目標
+       group:    顯示在側欄的分組名
+       label:    操作名稱
+       desc:     一句話說明，顯示在工具列下方
+       inverse:  (選填) 反向操作的 id，有填就會出現「套用反向操作」按鈕
+       needs:    (選填) 'key' | 'length' | 'charset'，要顯示哪些額外欄位
+       generator:(選填) true 表示不吃輸入，改顯示「重新產生」按鈕
+       render:   (選填) 'jwt' 表示改用結構化輸出而非純文字
+       fn:       (input, opt) => string 或 Promise<string>；丟出 Error 就會顯示在狀態列
+     }
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    input: $('input'), output: $('output'), jwtView: $('jwt-view'),
+    status: $('status'), toast: $('toast'), list: $('op-list'), search: $('op-search'),
+    title: $('op-title'), desc: $('op-desc'), paneIn: $('pane-in')
+  };
+
+  /* ── 位元組 / 文字互轉 ──────────────────────────────────── */
+
+  var enc = new TextEncoder();
+  var dec = new TextDecoder('utf-8', { fatal: true });
+
+  function bytesToBinaryString(bytes) {
+    var s = '', CHUNK = 0x8000;
+    for (var i = 0; i < bytes.length; i += CHUNK) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return s;
+  }
+
+  function binaryStringToBytes(str) {
+    var out = new Uint8Array(str.length);
+    for (var i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xFF;
+    return out;
+  }
+
+  function bytesToHex(bytes) {
+    var hex = '';
+    for (var i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+    return hex;
+  }
+
+  function hexToBytes(hex) {
+    var clean = hex.replace(/[\s:,-]/g, '');
+    if (clean.length % 2) throw new Error('十六進位字串長度必須是偶數，目前是 ' + clean.length + ' 個字元');
+    if (!/^[0-9a-fA-F]*$/.test(clean)) throw new Error('含有非十六進位字元');
+    var out = new Uint8Array(clean.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+    return out;
+  }
+
+  function b64FromBytes(bytes, urlSafe) {
+    var b64 = btoa(bytesToBinaryString(bytes));
+    return urlSafe ? b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : b64;
+  }
+
+  function bytesFromB64(str) {
+    var s = str.trim().replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
+    while (s.length % 4) s += '=';
+    var bin;
+    try { bin = atob(s); } catch (e) { throw new Error('不是合法的 Base64 內容'); }
+    return binaryStringToBytes(bin);
+  }
+
+  function decodeUtf8(bytes) {
+    try { return dec.decode(bytes); }
+    catch (e) { throw new Error('解出來的位元組不是合法的 UTF-8 文字（可能原本是二進位資料）'); }
+  }
+
+  /* ── 雜湊 ───────────────────────────────────────────────── */
+
+  function requireCrypto() {
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error('這個環境沒有提供 WebCrypto，雜湊功能無法使用。請確認頁面是以 https 或 localhost 開啟。');
+    }
+  }
+
+  function digest(algo, bytes) {
+    requireCrypto();
+    return crypto.subtle.digest(algo, bytes).then(function (buf) {
+      return bytesToHex(new Uint8Array(buf));
+    });
+  }
+
+  function hmac(algo, keyText, bytes) {
+    requireCrypto();
+    if (!keyText) throw new Error('HMAC 需要密鑰，請在上方欄位填入');
+    return crypto.subtle.importKey(
+      'raw', enc.encode(keyText), { name: 'HMAC', hash: algo }, false, ['sign']
+    ).then(function (key) {
+      return crypto.subtle.sign('HMAC', key, bytes);
+    }).then(function (buf) {
+      return bytesToHex(new Uint8Array(buf));
+    });
+  }
+
+  /* ── 亂數 ───────────────────────────────────────────────── */
+
+  var AMBIGUOUS = '0OoIl1|`\'"{}[]()/\\';
+
+  function randomFrom(charset, length) {
+    if (!charset.length) throw new Error('至少要勾選一種字元集');
+    var out = '';
+    var buf = new Uint32Array(length);
+    crypto.getRandomValues(buf);
+    // 拒絕取樣：避免直接取模造成的分佈偏差
+    var limit = Math.floor(0xFFFFFFFF / charset.length) * charset.length;
+    for (var i = 0; i < length; i++) {
+      var v = buf[i];
+      while (v >= limit) {
+        var one = new Uint32Array(1);
+        crypto.getRandomValues(one);
+        v = one[0];
+      }
+      out += charset[v % charset.length];
+    }
+    return out;
+  }
+
+  /* ── JWT ────────────────────────────────────────────────── */
+
+  function parseJWT(token) {
+    var t = token.trim();
+    var parts = t.split('.');
+    if (parts.length !== 3) {
+      throw new Error('JWT 應該是以英文句點分隔的三段，目前有 ' + parts.length + ' 段');
+    }
+    function seg(i, name) {
+      try { return JSON.parse(decodeUtf8(bytesFromB64(parts[i]))); }
+      catch (e) { throw new Error(name + ' 段解不開：' + e.message); }
+    }
+    return { header: seg(0, 'Header'), payload: seg(1, 'Payload'), signature: parts[2] };
+  }
+
+  /* ── 操作註冊表 ─────────────────────────────────────────── */
+
+  var OPS = [
+    /* ── 編碼轉換 ── */
+    { id: 'b64-enc', group: '編碼轉換', label: 'Base64 編碼', inverse: 'b64-dec',
+      desc: '文字先以 UTF-8 轉成位元組再編碼，中文與 emoji 都能正確處理。',
+      fn: function (s) { return b64FromBytes(enc.encode(s), false); } },
+    { id: 'b64-dec', group: '編碼轉換', label: 'Base64 解碼', inverse: 'b64-enc',
+      desc: '同時接受標準與 URL-safe 字元集，末尾的 = 補齊與否都可以。',
+      fn: function (s) { return decodeUtf8(bytesFromB64(s)); } },
+    { id: 'b64url-enc', group: '編碼轉換', label: 'Base64URL 編碼', inverse: 'b64-dec',
+      desc: '用 - 和 _ 取代 + 和 /，並去掉結尾的 =，可安全放進網址與 JWT。',
+      fn: function (s) { return b64FromBytes(enc.encode(s), true); } },
+    { id: 'url-enc', group: '編碼轉換', label: 'URL 編碼（元件）', inverse: 'url-dec',
+      desc: 'encodeURIComponent：連 / ? & = 等分隔符都會編碼，適合用在查詢參數的值。',
+      fn: function (s) { return encodeURIComponent(s); } },
+    { id: 'url-dec', group: '編碼轉換', label: 'URL 解碼', inverse: 'url-enc',
+      desc: 'decodeURIComponent：把 %XX 還原成原本的字元。',
+      fn: function (s) {
+        try { return decodeURIComponent(s); }
+        catch (e) { throw new Error('含有不完整或不合法的 % 逸出序列'); }
+      } },
+    { id: 'url-enc-full', group: '編碼轉換', label: 'URL 編碼（整條網址）', inverse: 'url-dec',
+      desc: 'encodeURI：保留 : / ? & = # 等結構字元，適合用在完整網址上。',
+      fn: function (s) { return encodeURI(s); } },
+    { id: 'html-esc', group: '編碼轉換', label: 'HTML 實體編碼', inverse: 'html-unesc',
+      desc: '把 & < > " \' 轉成實體，貼進 HTML 時不會被當成標籤解析。',
+      fn: function (s) {
+        return s.replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      } },
+    { id: 'html-unesc', group: '編碼轉換', label: 'HTML 實體解碼', inverse: 'html-esc',
+      desc: '把常見的具名實體與 &#NN; 數值實體還原成字元。',
+      fn: function (s) {
+        return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function (m, body) {
+          if (body[0] === '#') {
+            var code = body[1] === 'x' || body[1] === 'X'
+              ? parseInt(body.slice(2), 16)
+              : parseInt(body.slice(1), 10);
+            return isFinite(code) ? String.fromCodePoint(code) : m;
+          }
+          var named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+          return named[body.toLowerCase()] !== undefined ? named[body.toLowerCase()] : m;
+        });
+      } },
+    { id: 'uni-esc', group: '編碼轉換', label: 'Unicode 逸出', inverse: 'uni-unesc',
+      desc: '把非 ASCII 字元轉成 \\uXXXX，方便塞進只接受 ASCII 的設定檔。',
+      fn: function (s) {
+        var out = '';
+        for (var i = 0; i < s.length; i++) {
+          var c = s.charCodeAt(i);
+          out += c > 126 || c < 32
+            ? '\\u' + c.toString(16).padStart(4, '0')
+            : s[i];
+        }
+        return out;
+      } },
+    { id: 'uni-unesc', group: '編碼轉換', label: 'Unicode 還原', inverse: 'uni-esc',
+      desc: '把 \\uXXXX 與 \\u{XXXXX} 還原成字元。',
+      fn: function (s) {
+        return s
+          .replace(/\\u\{([0-9a-fA-F]+)\}/g, function (m, h) { return String.fromCodePoint(parseInt(h, 16)); })
+          .replace(/\\u([0-9a-fA-F]{4})/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); });
+      } },
+    { id: 'hex-enc', group: '編碼轉換', label: 'Hex 編碼', inverse: 'hex-dec',
+      desc: '把文字的 UTF-8 位元組印成十六進位。',
+      fn: function (s) { return bytesToHex(enc.encode(s)); } },
+    { id: 'hex-dec', group: '編碼轉換', label: 'Hex 解碼', inverse: 'hex-enc',
+      desc: '接受含空白、冒號或連字號分隔的十六進位字串。',
+      fn: function (s) { return decodeUtf8(hexToBytes(s)); } },
+
+    /* ── 雜湊 ── */
+    { id: 'sha1', group: '雜湊', label: 'SHA-1',
+      desc: '已不適合用於安全用途，僅供比對舊系統的既有雜湊值。',
+      fn: function (s) { return digest('SHA-1', enc.encode(s)); } },
+    { id: 'sha256', group: '雜湊', label: 'SHA-256',
+      desc: '目前的通用預設選擇。',
+      fn: function (s) { return digest('SHA-256', enc.encode(s)); } },
+    { id: 'sha384', group: '雜湊', label: 'SHA-384',
+      desc: 'SHA-2 家族，輸出 96 個十六進位字元。',
+      fn: function (s) { return digest('SHA-384', enc.encode(s)); } },
+    { id: 'sha512', group: '雜湊', label: 'SHA-512',
+      desc: 'SHA-2 家族，輸出 128 個十六進位字元。',
+      fn: function (s) { return digest('SHA-512', enc.encode(s)); } },
+    { id: 'hmac256', group: '雜湊', label: 'HMAC-SHA-256', needs: 'key',
+      desc: '用上方密鑰對輸入做訊息鑑別碼。密鑰只留在這個分頁的記憶體裡。',
+      fn: function (s, opt) { return hmac('SHA-256', opt.key, enc.encode(s)); } },
+    { id: 'hmac512', group: '雜湊', label: 'HMAC-SHA-512', needs: 'key',
+      desc: '同上，改用 SHA-512。',
+      fn: function (s, opt) { return hmac('SHA-512', opt.key, enc.encode(s)); } },
+
+    /* ── 解析 ── */
+    { id: 'jwt', group: '解析', label: 'JWT 解碼', render: 'jwt',
+      desc: '只解碼、不驗簽——這裡讀得出內容，不代表這個權杖是有效的。',
+      fn: function (s) { return parseJWT(s); } },
+
+    /* ── 產生器 ── */
+    { id: 'uuid', group: '產生器', label: 'UUID v4', generator: true,
+      desc: '以 crypto.randomUUID 產生；不支援時退回 getRandomValues 自行組裝。',
+      fn: function () {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        var b = new Uint8Array(16);
+        crypto.getRandomValues(b);
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        var h = bytesToHex(b);
+        return [h.slice(0,8), h.slice(8,12), h.slice(12,16), h.slice(16,20), h.slice(20)].join('-');
+      } },
+    { id: 'password', group: '產生器', label: '隨機密碼', generator: true, needs: 'charset',
+      desc: '使用 crypto.getRandomValues 並以拒絕取樣避免分佈偏差，不是 Math.random。',
+      fn: function (s, opt) {
+        var cs = '';
+        if (opt.upper) cs += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        if (opt.lower) cs += 'abcdefghijklmnopqrstuvwxyz';
+        if (opt.digit) cs += '0123456789';
+        if (opt.symbol) cs += '!@#$%^&*-_=+?';
+        if (opt.unambiguous) {
+          cs = cs.split('').filter(function (c) { return AMBIGUOUS.indexOf(c) < 0; }).join('');
+        }
+        return randomFrom(cs.split(''), opt.length);
+      } },
+    { id: 'token-hex', group: '產生器', label: '隨機 Hex 權杖', generator: true, needs: 'length',
+      desc: '產生指定位元組數的隨機值並以十六進位輸出（長度欄位為位元組數）。',
+      fn: function (s, opt) {
+        var b = new Uint8Array(opt.length);
+        crypto.getRandomValues(b);
+        return bytesToHex(b);
+      } },
+    { id: 'token-b64', group: '產生器', label: '隨機 Base64URL 權杖', generator: true, needs: 'length',
+      desc: '產生指定位元組數的隨機值並以 Base64URL 輸出，適合當 session token。',
+      fn: function (s, opt) {
+        var b = new Uint8Array(opt.length);
+        crypto.getRandomValues(b);
+        return b64FromBytes(b, true);
+      } }
+  ];
+
+  var current = OPS[0];
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { els.toast.classList.remove('is-on'); }, 1900);
+  }
+
+  function setStatus(html, kind) {
+    els.status.className = 'statusbar' + (kind ? ' is-' + kind : '');
+    els.status.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  /* ── 側欄 ───────────────────────────────────────────────── */
+
+  function buildList() {
+    var q = els.search.value.trim().toLowerCase();
+    var matched = OPS.filter(function (op) {
+      if (!q) return true;
+      return (op.label + ' ' + op.id + ' ' + op.group + ' ' + (op.desc || '')).toLowerCase().indexOf(q) >= 0;
+    });
+
+    els.list.innerHTML = '';
+    if (!matched.length) {
+      var none = document.createElement('div');
+      none.className = 'ops__empty';
+      none.textContent = '沒有符合「' + els.search.value + '」的操作';
+      els.list.appendChild(none);
+      return;
+    }
+
+    var lastGroup = null;
+    matched.forEach(function (op) {
+      if (op.group !== lastGroup) {
+        lastGroup = op.group;
+        var g = document.createElement('div');
+        g.className = 'ops__group';
+        g.textContent = op.group;
+        els.list.appendChild(g);
+      }
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'op' + (op.id === current.id ? ' is-active' : '');
+      btn.dataset.op = op.id;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', op.id === current.id ? 'true' : 'false');
+      btn.textContent = op.label;
+      btn.addEventListener('click', function () { selectOp(op.id); });
+      els.list.appendChild(btn);
+    });
+  }
+
+  function selectOp(id) {
+    var op = OPS.filter(function (o) { return o.id === id; })[0];
+    if (!op) return;
+    current = op;
+
+    els.title.textContent = op.label;
+    els.desc.textContent = op.desc || '';
+
+    $('f-key').classList.toggle('hidden', op.needs !== 'key');
+    $('f-length').classList.toggle('hidden', !(op.needs === 'length' || op.needs === 'charset'));
+    $('f-charset').classList.toggle('hidden', op.needs !== 'charset');
+    $('btn-swap').classList.toggle('hidden', !op.inverse);
+    $('btn-run').classList.toggle('hidden', !op.generator);
+    els.paneIn.classList.toggle('hidden', !!op.generator);
+
+    if (op.needs === 'length') $('gen-length').value = '32';
+    else if (op.needs === 'charset') $('gen-length').value = '24';
+
+    buildList();
+    run();
+  }
+
+  /* ── 選項 ───────────────────────────────────────────────── */
+
+  function options() {
+    return {
+      key: $('hmac-key').value,
+      length: Math.max(4, Math.min(256, Number($('gen-length').value) || 24)),
+      upper: $('cs-upper').checked,
+      lower: $('cs-lower').checked,
+      digit: $('cs-digit').checked,
+      symbol: $('cs-symbol').checked,
+      unambiguous: $('cs-unambiguous').checked
+    };
+  }
+
+  /* ── 執行 ───────────────────────────────────────────────── */
+
+  var runToken = 0;
+
+  function run() {
+    var op = current;
+    var myToken = ++runToken;
+
+    var src = els.input.value;
+    $('in-meta').textContent = fmtBytes(new Blob([src]).size);
+
+    els.jwtView.classList.add('hidden');
+    els.output.classList.remove('hidden');
+
+    if (!op.generator && !src) {
+      els.output.value = '';
+      $('out-meta').textContent = '';
+      setStatus('等待輸入 — ' + esc(op.label) + '。');
+      return;
+    }
+
+    var t0 = performance.now();
+    var result;
+    try {
+      result = op.fn(src, options());
+    } catch (e) {
+      showError(op, e);
+      return;
+    }
+
+    Promise.resolve(result).then(function (value) {
+      if (myToken !== runToken) return;   // 已有更新的執行，丟棄這次結果
+      var ms = Math.round(performance.now() - t0);
+
+      if (op.render === 'jwt') {
+        renderJWT(value);
+        setStatus('已解碼 JWT · 耗時 <code>' + Math.max(1, ms) + ' ms</code> — ' +
+                  '<strong>本工具不驗證簽章</strong>，內容可讀不代表權杖有效。', 'warn');
+        return;
+      }
+
+      els.output.value = value;
+      $('out-meta').textContent = value.length + ' 字元';
+      setStatus(esc(op.label) + ' 完成 · 耗時 <code>' + Math.max(1, ms) + ' ms</code>' +
+                (op.group === '雜湊' ? ' · 輸出 <code>' + value.length * 4 + '</code> 位元' : ''), 'ok');
+    }).catch(function (e) {
+      if (myToken !== runToken) return;
+      showError(op, e);
+    });
+  }
+
+  function showError(op, e) {
+    els.output.value = '';
+    $('out-meta').textContent = '';
+    els.jwtView.classList.add('hidden');
+    els.output.classList.remove('hidden');
+    setStatus(esc(op.label) + ' 失敗：' + esc((e && e.message) || String(e)), 'error');
+  }
+
+  /* ── JWT 結構化輸出 ─────────────────────────────────────── */
+
+  function renderJWT(parsed) {
+    els.output.classList.add('hidden');
+    els.jwtView.classList.remove('hidden');
+    els.jwtView.innerHTML = '';
+    $('out-meta').textContent = 'header · payload · signature';
+
+    function part(cls, label, body) {
+      var wrap = document.createElement('div');
+      wrap.className = 'jwt__part';
+      var l = document.createElement('div');
+      l.className = 'jwt__label jwt__label--' + cls;
+      l.textContent = label;
+      var b = document.createElement('div');
+      b.className = 'jwt__body';
+      b.textContent = body;
+      wrap.appendChild(l);
+      wrap.appendChild(b);
+      return wrap;
+    }
+
+    els.jwtView.appendChild(part('header', 'Header', JSON.stringify(parsed.header, null, 2)));
+
+    var payloadEl = part('payload', 'Payload', JSON.stringify(parsed.payload, null, 2));
+
+    // 把時間類 claim 翻成人看得懂的形式
+    var claims = document.createElement('div');
+    claims.className = 'jwt__claims';
+    var now = Date.now() / 1000;
+    [['exp', '到期'], ['iat', '簽發'], ['nbf', '生效']].forEach(function (pair) {
+      var v = parsed.payload[pair[0]];
+      if (typeof v !== 'number') return;
+      var row = document.createElement('div');
+      row.className = 'jwt__claim';
+      var expired = pair[0] === 'exp' && v < now;
+      var notYet = pair[0] === 'nbf' && v > now;
+      if (expired || notYet) row.className += ' is-expired';
+      var b = document.createElement('b');
+      b.textContent = pair[0];
+      var span = document.createElement('span');
+      span.textContent = pair[1] + '：' + new Date(v * 1000).toLocaleString() +
+        (expired ? '（已過期）' : notYet ? '（尚未生效）' : '');
+      row.appendChild(b);
+      row.appendChild(span);
+      claims.appendChild(row);
+    });
+    if (claims.children.length) payloadEl.appendChild(claims);
+
+    els.jwtView.appendChild(payloadEl);
+    els.jwtView.appendChild(part('sig', 'Signature（未驗證）', parsed.signature));
+  }
+
+  /* ── 檔案：拖進來就算雜湊 ───────────────────────────────── */
+
+  function hashFile(file) {
+    requireCrypto();
+    var MAX = 200 * 1024 * 1024;
+    if (file.size > MAX) {
+      setStatus('<code>' + esc(file.name) + '</code> 為 ' + fmtBytes(file.size) +
+                '，超過 200 MB 上限。', 'error');
+      return;
+    }
+
+    setStatus('正在讀取 <code>' + esc(file.name) + '</code>（' + fmtBytes(file.size) + '）…');
+
+    var t0 = performance.now();
+    file.arrayBuffer().then(function (buf) {
+      return Promise.all([
+        crypto.subtle.digest('SHA-256', buf),
+        crypto.subtle.digest('SHA-1', buf)
+      ]);
+    }).then(function (digests) {
+      var ms = Math.round(performance.now() - t0);
+      els.jwtView.classList.add('hidden');
+      els.output.classList.remove('hidden');
+      els.output.value =
+        'File   : ' + file.name + '\n' +
+        'Size   : ' + file.size.toLocaleString('en-US') + ' bytes (' + fmtBytes(file.size) + ')\n' +
+        'Type   : ' + (file.type || 'unknown') + '\n\n' +
+        'SHA-256: ' + bytesToHex(new Uint8Array(digests[0])) + '\n' +
+        'SHA-1  : ' + bytesToHex(new Uint8Array(digests[1]));
+      $('out-meta').textContent = '檔案雜湊';
+      setStatus('已算出 <code>' + esc(file.name) + '</code> 的雜湊 · 耗時 <code>' + ms +
+                ' ms</code> — 可拿去和下載頁公布的校驗碼比對。', 'ok');
+    }).catch(function (e) {
+      setStatus('讀取或雜湊檔案失敗：' + esc((e && e.message) || String(e)), 'error');
+    });
+  }
+
+  /* ── 事件 ───────────────────────────────────────────────── */
+
+  var timer = null;
+  els.input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(run, 180);
+  });
+
+  els.search.addEventListener('input', buildList);
+
+  ['hmac-key', 'gen-length', 'cs-upper', 'cs-lower', 'cs-digit', 'cs-symbol', 'cs-unambiguous']
+    .forEach(function (id) { $(id).addEventListener('input', run); });
+
+  $('key-visible').addEventListener('change', function () {
+    $('hmac-key').type = this.checked ? 'text' : 'password';
+  });
+
+  $('btn-run').addEventListener('click', run);
+
+  $('btn-swap').addEventListener('click', function () {
+    if (!current.inverse) return;
+    // 把目前輸出搬到輸入，再切換到反向操作
+    var produced = els.output.value;
+    var target = current.inverse;
+    if (produced) els.input.value = produced;
+    selectOp(target);
+    toast('已切換到「' + current.label + '」');
+  });
+
+  $('btn-clear').addEventListener('click', function () {
+    els.input.value = '';
+    run();
+    els.input.focus();
+  });
+
+  $('btn-copy').addEventListener('click', function () {
+    var text = els.jwtView.classList.contains('hidden') ? els.output.value : els.jwtView.textContent;
+    if (!text) { toast('沒有可複製的內容'); return; }
+
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      toast(ok ? '已複製結果' : '此環境不允許自動複製，請手動選取輸出區複製');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('已複製結果'); }, fallback);
+    } else { fallback(); }
+  });
+
+  // 拖放檔案 → 算雜湊
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    els.paneIn.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      els.paneIn.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    els.paneIn.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (ev === 'dragleave' && els.paneIn.contains(e.relatedTarget)) return;
+      els.paneIn.classList.remove('is-dragging');
+    });
+  });
+  els.paneIn.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      hashFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  if (!window.crypto || !window.crypto.subtle) {
+    setStatus('這個環境沒有 WebCrypto，雜湊與亂數相關操作會失敗；編碼轉換仍可正常使用。', 'warn');
+  }
+
+  selectOp('b64-enc');
+})();
+</script>
+</body>
+</html>
