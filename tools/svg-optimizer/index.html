@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG 優化器</title>
+  <meta name="description" content="以 SVGO 精簡 SVG 檔案：移除冗餘標記、壓縮路徑資料並即時對照渲染結果。全部在瀏覽器完成，檔案不會上傳。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 20px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 12px; margin-bottom: 12px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .toolbar__sep { width: 1px; height: 22px; background: var(--al-border); margin: 0 2px; }
+    .toolbar__spacer { flex: 1 1 auto; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); white-space: nowrap; }
+    .field output { font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700); min-width: 16px; text-align: right; }
+    input[type="range"] { width: 110px; accent-color: var(--al-accent); }
+    .check {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); cursor: pointer;
+    }
+    .check input { accent-color: var(--al-accent); }
+    .check.is-risky { color: var(--al-warn-text); }
+
+    /* ── Plugin panel ── */
+    details.plugins {
+      margin-bottom: 12px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    details.plugins > summary {
+      padding: 11px 14px; cursor: pointer; list-style: none;
+      font-family: var(--al-font-body); font-size: 12.5px; font-weight: 600; color: var(--al-slate-700);
+      background: var(--al-bg-alt);
+      display: flex; align-items: center; gap: 8px;
+    }
+    details.plugins > summary::-webkit-details-marker { display: none; }
+    details.plugins > summary::before { content: '▸'; color: var(--al-slate-400); }
+    details.plugins[open] > summary::before { content: '▾'; }
+    .plugins__body { padding: 14px; }
+    .plugins__group + .plugins__group { margin-top: 16px; }
+    .plugins__title {
+      font-family: var(--al-font-body); font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--al-slate-400); margin-bottom: 8px;
+    }
+    .plugins__grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 14px;
+    }
+    .plugins__grid .check { font-family: var(--al-font-mono); font-size: 11.5px; }
+    .plugins__actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* ── Panes ── */
+    .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+
+    .pane {
+      display: flex; flex-direction: column; min-width: 0;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    .pane__head {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 14px;
+      background: var(--al-bg-alt);
+      border-bottom: 1px solid var(--al-border-soft);
+    }
+    .pane__title {
+      font-family: var(--al-font-body); font-size: 12px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--al-slate-700); margin: 0;
+    }
+    .pane__meta { font-family: var(--al-font-mono); font-size: 11px; color: var(--al-slate-400); margin-left: auto; }
+
+    .preview {
+      height: 200px; padding: 12px;
+      display: flex; align-items: center; justify-content: center;
+      border-bottom: 1px solid var(--al-border-soft);
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 18px 18px; background-position: 0 0, 9px 9px;
+    }
+    .preview img { max-width: 100%; max-height: 176px; }
+    .preview__none {
+      font-family: var(--al-font-body); font-size: 12.5px; color: var(--al-slate-400);
+    }
+
+    textarea {
+      width: 100%; min-height: 300px; resize: vertical; flex: 1 1 auto;
+      font-family: var(--al-font-mono); font-size: 12.5px; line-height: 1.6;
+      color: var(--al-slate-700); background: var(--al-white);
+      border: 0; outline: none; padding: 14px; tab-size: 2;
+    }
+    textarea[readonly] { background: #FCFCFA; }
+
+    .drop-hint {
+      position: absolute; inset: 0; z-index: 5;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(79,70,229,.06); border: 2px dashed var(--al-accent);
+      border-radius: var(--al-radius-lg);
+      font-family: var(--al-font-body); font-size: 14px; color: var(--al-accent);
+    }
+    .pane.is-dragging { position: relative; }
+    .pane.is-dragging .drop-hint { display: flex; }
+
+    /* ── Stats ── */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+    @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat {
+      padding: 12px 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      box-shadow: var(--al-shadow-card);
+    }
+    .stat__label {
+      font-family: var(--al-font-body); font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--al-slate-400); margin-bottom: 4px;
+    }
+    .stat__value { font-family: var(--al-font-mono); font-size: 18px; color: var(--al-ink); }
+    .stat__value.is-good { color: #047857; }
+    .stat__value.is-bad { color: var(--al-error-text); }
+    .stat__sub { font-family: var(--al-font-body); font-size: 11px; color: var(--al-slate-500); margin-top: 2px; }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 14px; padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 50; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>SVG 優化器</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+      <span class="al-badge" id="svgo-version">SVGO 載入中…</span>
+    </div>
+    <p>用 SVGO 精簡 SVG：移除編輯器殘留標記、壓縮路徑數字、合併群組，並即時對照優化前後的渲染結果。檔案只在你的瀏覽器裡處理，不會上傳。</p>
+  </header>
+
+  <div class="toolbar" role="toolbar" aria-label="優化設定">
+    <div class="field">
+      <label for="precision">數字精度</label>
+      <input type="range" id="precision" min="0" max="8" step="1" value="3" />
+      <output id="out-precision">3</output>
+    </div>
+
+    <label class="check" title="反覆優化直到檔案不再變小，較慢但通常更小">
+      <input type="checkbox" id="multipass" checked />
+      <span>多輪優化</span>
+    </label>
+
+    <label class="check" title="輸出保留換行與縮排，方便閱讀但檔案較大">
+      <input type="checkbox" id="pretty" />
+      <span>易讀排版</span>
+    </label>
+
+    <div class="toolbar__sep" aria-hidden="true"></div>
+
+    <label class="check is-risky" id="lbl-viewbox" title="移除 viewBox 後，SVG 將無法隨容器自由縮放。只有在你確定用固定尺寸時才開。">
+      <input type="checkbox" id="p-removeViewBox" />
+      <span>移除 viewBox</span>
+    </label>
+
+    <label class="check" title="移除根元素的 width / height，讓 SVG 完全由 CSS 控制尺寸">
+      <input type="checkbox" id="p-removeDimensions" />
+      <span>移除 width/height</span>
+    </label>
+
+    <label class="check is-risky" title="移除 &lt;title&gt;，會讓螢幕閱讀器少掉這個圖形的說明">
+      <input type="checkbox" id="p-removeTitle" />
+      <span>移除 title</span>
+    </label>
+
+    <div class="toolbar__spacer"></div>
+
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-sample" type="button">載入範例</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-file" type="button">開啟 SVG</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-clear" type="button">清空</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-copy" type="button">複製結果</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-download" type="button">下載</button>
+    <input type="file" id="file-input" class="visually-hidden" accept=".svg,image/svg+xml" />
+  </div>
+
+  <details class="plugins">
+    <summary>全部外掛設定<span id="plugin-count" style="font-weight:400;color:var(--al-slate-400)"></span></summary>
+    <div class="plugins__body">
+      <div class="plugins__group">
+        <div class="plugins__title">預設啟用（preset-default）</div>
+        <div class="plugins__grid" id="grid-default"></div>
+      </div>
+      <div class="plugins__group">
+        <div class="plugins__title">選用外掛（預設關閉）</div>
+        <div class="plugins__grid" id="grid-extra"></div>
+      </div>
+      <div class="plugins__actions">
+        <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-preset-all" type="button">全部啟用預設組</button>
+        <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-preset-none" type="button">全部停用預設組</button>
+        <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-preset-reset" type="button">回到 SVGO 預設</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="panes">
+    <section class="pane" id="pane-in" aria-label="原始 SVG">
+      <div class="pane__head">
+        <h2 class="pane__title">原始 SVG</h2>
+        <span class="pane__meta" id="in-meta">0 B</span>
+      </div>
+      <div class="preview" id="preview-in">
+        <span class="preview__none">尚未載入</span>
+      </div>
+      <textarea id="input" spellcheck="false" autocomplete="off"
+                placeholder="貼上 SVG 原始碼，或把 .svg 檔拖進來"></textarea>
+      <div class="drop-hint" aria-hidden="true">放開以載入 SVG</div>
+    </section>
+
+    <section class="pane" aria-label="優化後 SVG">
+      <div class="pane__head">
+        <h2 class="pane__title">優化後</h2>
+        <span class="pane__meta" id="out-meta"></span>
+      </div>
+      <div class="preview" id="preview-out">
+        <span class="preview__none">等待輸入</span>
+      </div>
+      <textarea id="output" spellcheck="false" readonly placeholder="優化結果會出現在這裡"></textarea>
+    </section>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat__label">原始大小</div>
+      <div class="stat__value" id="st-before">—</div>
+      <div class="stat__sub">UTF-8 位元組</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">優化後大小</div>
+      <div class="stat__value" id="st-after">—</div>
+      <div class="stat__sub" id="st-after-sub">UTF-8 位元組</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">省下</div>
+      <div class="stat__value" id="st-saved">—</div>
+      <div class="stat__sub" id="st-saved-sub"></div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">優化耗時</div>
+      <div class="stat__value" id="st-time">—</div>
+      <div class="stat__sub" id="st-passes">SVGO 執行時間</div>
+    </div>
+  </div>
+
+  <div class="statusbar" id="status" role="status" aria-live="polite">正在載入 SVGO…</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     SVGO 以動態 import 載入本機 vendored 的 ES module，
+     不依賴任何 CDN；載入失敗會在狀態列明講，不會留下白畫面。
+
+     預覽一律走 <img src="data:image/svg+xml;...">：
+     img 不會執行 SVG 內的 <script>，所以貼進來的檔案就算含有
+     惡意腳本也不會在本頁執行。切勿改成 innerHTML 直接塞。
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    input: $('input'), output: $('output'),
+    status: $('status'), toast: $('toast'),
+    precision: $('precision'), multipass: $('multipass'), pretty: $('pretty'),
+    previewIn: $('preview-in'), previewOut: $('preview-out'),
+    paneIn: $('pane-in'), fileInput: $('file-input')
+  };
+
+  var svgo = null;
+  var presetNames = [];       // preset-default 內含的外掛名
+  var extraNames = [];        // 其餘可選用外掛
+  var toggles = {};           // name -> input element
+
+  // 主工具列上已經有獨立開關的外掛，不要在面板裡重複一份
+  var PROMOTED = ['removeViewBox', 'removeDimensions', 'removeTitle'];
+
+  // 這些外掛改動後容易讓圖壞掉或影響無障礙，標成警告色
+  var RISKY = {
+    removeViewBox: '移除後 SVG 無法隨容器縮放',
+    removeTitle: '移除後螢幕閱讀器少掉圖形說明',
+    removeDesc: '移除後螢幕閱讀器少掉詳細描述',
+    cleanupIds: '會改寫 id，外部 CSS / JS 若用 id 參照會失效',
+    prefixIds: '會替所有 id 加前綴',
+    removeXMLNS: '移除命名空間後，單獨開啟 .svg 檔可能無法顯示',
+    removeRasterImages: '會刪掉內嵌的點陣圖',
+    removeStyleElement: '會刪掉整個 <style> 區塊',
+    removeScripts: '會刪掉 SVG 內的腳本',
+    removeHiddenElems: '會刪掉隱藏元素，若靠 JS 切換顯示會壞掉',
+    removeOffCanvasPaths: '會刪掉視窗外的路徑'
+  };
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { els.toast.classList.remove('is-on'); }, 1900);
+  }
+
+  function setStatus(html, kind) {
+    els.status.className = 'statusbar' + (kind ? ' is-' + kind : '');
+    els.status.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function bytesOf(s) { return new Blob([s]).size; }
+
+  function fmtBytes(n) {
+    if (n === null || n === undefined) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  /* ── 載入 SVGO ──────────────────────────────────────────── */
+
+  function loadSVGO() {
+    return import('./libs/svgo.browser.js').then(function (mod) {
+      svgo = mod;
+      $('svgo-version').textContent = 'SVGO ' + (mod.VERSION || '?');
+
+      var preset = (mod.builtinPlugins || []).filter(function (p) { return p.name === 'preset-default'; })[0];
+      presetNames = preset && preset.plugins
+        ? preset.plugins.map(function (p) { return typeof p === 'string' ? p : p.name; }).filter(Boolean)
+        : [];
+
+      extraNames = (mod.builtinPlugins || [])
+        .filter(function (p) { return !p.isPreset && presetNames.indexOf(p.name) < 0; })
+        .map(function (p) { return p.name; });
+
+      buildPluginPanel();
+      setStatus('SVGO <code>' + esc(mod.VERSION || '?') + '</code> 已就緒，貼上或拖入 SVG 就會開始優化。');
+      run();
+    }).catch(function (e) {
+      var msg = e && e.message ? e.message : String(e);
+      $('svgo-version').textContent = 'SVGO 載入失敗';
+      setStatus('無法載入 SVGO：<code>' + esc(msg) + '</code>。' +
+                '若是在大廳的預覽小視窗中開啟，請改用「在新頁開啟」；本機以 <code>file://</code> 直接開啟也會因瀏覽器的模組安全限制而失敗。', 'error');
+      throw e;
+    });
+  }
+
+  /* ── 外掛面板 ───────────────────────────────────────────── */
+
+  function makeToggle(name, checked, isExtra) {
+    var label = document.createElement('label');
+    label.className = 'check' + (RISKY[name] ? ' is-risky' : '');
+    if (RISKY[name]) label.title = RISKY[name];
+
+    var input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = checked;
+    input.dataset.plugin = name;
+    input.dataset.extra = isExtra ? '1' : '';
+    input.addEventListener('change', run);
+
+    var span = document.createElement('span');
+    span.textContent = name;
+
+    label.appendChild(input);
+    label.appendChild(span);
+    toggles[name] = input;
+    return label;
+  }
+
+  function buildPluginPanel() {
+    var gd = $('grid-default'), ge = $('grid-extra');
+    gd.innerHTML = ''; ge.innerHTML = '';
+
+    presetNames.forEach(function (n) {
+      if (PROMOTED.indexOf(n) >= 0) return;
+      gd.appendChild(makeToggle(n, true, false));
+    });
+    extraNames.forEach(function (n) {
+      if (PROMOTED.indexOf(n) >= 0) return;
+      ge.appendChild(makeToggle(n, false, true));
+    });
+
+    // 工具列上的三個提升開關也納入同一份 toggles 表
+    PROMOTED.forEach(function (n) {
+      var el = $('p-' + n);
+      if (el) {
+        toggles[n] = el;
+        el.dataset.plugin = n;
+        el.dataset.extra = presetNames.indexOf(n) >= 0 ? '' : '1';
+        el.addEventListener('change', run);
+      }
+    });
+
+    $('plugin-count').textContent = '（預設 ' + presetNames.length + ' 個 · 選用 ' + extraNames.length + ' 個）';
+  }
+
+  function currentConfig() {
+    var overrides = {};
+    var extras = [];
+
+    Object.keys(toggles).forEach(function (name) {
+      var el = toggles[name];
+      var isExtra = el.dataset.extra === '1';
+      if (isExtra) {
+        if (el.checked) extras.push(name);
+      } else if (!el.checked) {
+        overrides[name] = false;
+      }
+    });
+
+    return {
+      multipass: els.multipass.checked,
+      floatPrecision: Number(els.precision.value),
+      js2svg: { pretty: els.pretty.checked, indent: 2 },
+      plugins: [{ name: 'preset-default', params: { overrides: overrides } }].concat(extras)
+    };
+  }
+
+  /* ── 預覽（安全渲染） ───────────────────────────────────── */
+
+  function renderPreview(container, svgText, label) {
+    container.innerHTML = '';
+    if (!svgText || !svgText.trim()) {
+      var none = document.createElement('span');
+      none.className = 'preview__none';
+      none.textContent = label;
+      container.appendChild(none);
+      return;
+    }
+    var img = document.createElement('img');
+    img.alt = label;
+    // 以 data URI 餵給 <img>：SVG 內的腳本在 <img> 情境下不會執行
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+    img.onerror = function () {
+      container.innerHTML = '';
+      var bad = document.createElement('span');
+      bad.className = 'preview__none';
+      bad.textContent = '這段內容無法當成 SVG 渲染';
+      container.appendChild(bad);
+    };
+    container.appendChild(img);
+  }
+
+  /* ── 主流程 ─────────────────────────────────────────────── */
+
+  var timer = null;
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(run, 220);
+  }
+
+  function run() {
+    if (!svgo) return;
+
+    var src = els.input.value;
+    var srcBytes = bytesOf(src);
+    $('in-meta').textContent = fmtBytes(srcBytes);
+    renderPreview(els.previewIn, src, '尚未載入');
+
+    if (!src.trim()) {
+      els.output.value = '';
+      $('out-meta').textContent = '';
+      renderPreview(els.previewOut, '', '等待輸入');
+      ['st-before', 'st-after', 'st-saved', 'st-time'].forEach(function (id) {
+        $(id).textContent = '—';
+        $(id).className = 'stat__value';
+      });
+      $('st-saved-sub').textContent = '';
+      setStatus('SVGO <code>' + esc(svgo.VERSION || '?') + '</code> 已就緒，貼上或拖入 SVG 就會開始優化。');
+      return;
+    }
+
+    if (src.indexOf('<svg') < 0) {
+      setStatus('看起來不是 SVG — 內容中找不到 <code>&lt;svg</code> 標籤。', 'error');
+      return;
+    }
+
+    var t0 = performance.now();
+    var result;
+    try {
+      result = svgo.optimize(src, currentConfig());
+    } catch (e) {
+      var msg = e && e.message ? e.message : String(e);
+      setStatus('SVGO 優化失敗：<code>' + esc(msg) + '</code>。多半是 SVG 本身語法有誤，或某個外掛不適用於這個檔案。', 'error');
+      els.output.value = '';
+      renderPreview(els.previewOut, '', '優化失敗');
+      return;
+    }
+    var ms = Math.round(performance.now() - t0);
+
+    var out = result.data || '';
+    els.output.value = out;
+
+    var outBytes = bytesOf(out);
+    $('out-meta').textContent = fmtBytes(outBytes);
+    renderPreview(els.previewOut, out, '優化後');
+
+    $('st-before').textContent = fmtBytes(srcBytes);
+    $('st-after').textContent = fmtBytes(outBytes);
+    $('st-time').textContent = ms + ' ms';
+
+    var saved = srcBytes - outBytes;
+    var pct = srcBytes ? (saved / srcBytes * 100) : 0;
+    var elSaved = $('st-saved');
+    elSaved.textContent = (saved >= 0 ? '' : '+') + fmtBytes(Math.abs(saved));
+    elSaved.className = 'stat__value ' + (saved > 0 ? 'is-good' : (saved < 0 ? 'is-bad' : ''));
+    $('st-saved-sub').textContent = (saved >= 0 ? '減少 ' : '增加 ') + Math.abs(pct).toFixed(1) + '%';
+    $('st-passes').textContent = els.multipass.checked ? '多輪優化' : '單輪優化';
+
+    var warn = [];
+    if (toggles.removeViewBox && toggles.removeViewBox.checked) warn.push('已移除 <code>viewBox</code>，這張圖不再能隨容器縮放');
+    if (toggles.cleanupIds && toggles.cleanupIds.checked && /\bid\s*=/.test(src)) {
+      warn.push('<code>cleanupIds</code> 會改寫 id，若外部 CSS / JS 用 id 參照這張圖，記得一併檢查');
+    }
+
+    if (saved < 0) {
+      setStatus('輸出比原檔大 ' + Math.abs(pct).toFixed(1) + '% — 這個檔案可能已經被優化過，或「易讀排版」正在增加空白。', 'warn');
+    } else if (warn.length) {
+      setStatus('省下 <code>' + fmtBytes(saved) + '</code>（' + pct.toFixed(1) + '%）· 耗時 <code>' + ms +
+                ' ms</code> — ' + warn.join('；') + '。', 'warn');
+    } else {
+      setStatus('省下 <code>' + fmtBytes(saved) + '</code>（' + pct.toFixed(1) + '%）· 耗時 <code>' + ms + ' ms</code>。', 'ok');
+    }
+  }
+
+  /* ── 檔案 / 複製 / 下載 ─────────────────────────────────── */
+
+  function loadFile(file) {
+    if (!file) return;
+    if (!/svg/i.test(file.type) && !/\.svg$/i.test(file.name)) {
+      setStatus('<code>' + esc(file.name) + '</code> 看起來不是 SVG 檔。', 'error');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setStatus('<code>' + esc(file.name) + '</code> 為 ' + fmtBytes(file.size) + '，超過 10 MB 上限。', 'error');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () { setStatus('讀取 <code>' + esc(file.name) + '</code> 失敗。', 'error'); };
+    reader.onload = function () {
+      els.input.value = String(reader.result || '');
+      els.input.dataset.filename = file.name;
+      run();
+      toast('已載入 ' + file.name);
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function copyText(text) {
+    if (!text) { toast('沒有可複製的內容'); return; }
+    function fallback() {
+      els.output.removeAttribute('readonly');
+      els.output.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      els.output.setAttribute('readonly', '');
+      toast(ok ? '已複製結果' : '此環境不允許自動複製，請手動選取右側內容複製');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('已複製結果'); }, fallback);
+    } else { fallback(); }
+  }
+
+  /* ── 事件 ───────────────────────────────────────────────── */
+
+  els.input.addEventListener('input', schedule);
+  els.precision.addEventListener('input', function () { $('out-precision').textContent = els.precision.value; });
+  els.precision.addEventListener('change', run);
+  els.multipass.addEventListener('change', run);
+  els.pretty.addEventListener('change', run);
+
+  $('btn-file').addEventListener('click', function () { els.fileInput.click(); });
+  els.fileInput.addEventListener('change', function () {
+    loadFile(els.fileInput.files && els.fileInput.files[0]);
+    els.fileInput.value = '';
+  });
+
+  $('btn-clear').addEventListener('click', function () {
+    els.input.value = '';
+    delete els.input.dataset.filename;
+    run();
+    els.input.focus();
+  });
+
+  $('btn-copy').addEventListener('click', function () { copyText(els.output.value); });
+
+  $('btn-download').addEventListener('click', function () {
+    if (!els.output.value) { toast('沒有可下載的內容'); return; }
+    var base = (els.input.dataset.filename || 'optimized.svg').replace(/\.svg$/i, '');
+    var blob = new Blob([els.output.value], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = base + '.min.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('已開始下載 ' + a.download);
+  });
+
+  $('btn-sample').addEventListener('click', function () {
+    els.input.value =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<!-- Generator: 某某繪圖軟體 -->\n' +
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"\n' +
+      '     version="1.1" width="120px" height="120px" viewBox="0 0 120 120">\n' +
+      '  <title>範例圖形</title>\n' +
+      '  <desc>一個用來示範 SVGO 的圖形</desc>\n' +
+      '  <metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"></rdf:RDF></metadata>\n' +
+      '  <defs>\n' +
+      '    <linearGradient id="unusedGradient"><stop offset="0" stop-color="#ffffff"/></linearGradient>\n' +
+      '  </defs>\n' +
+      '  <g id="layer1" transform="translate(0.0000000,0.0000000)">\n' +
+      '    <g>\n' +
+      '      <rect x="10.00000" y="10.00000" width="100.000000" height="100.0000" rx="12.000000"\n' +
+      '            fill="#4F46E5" stroke="none" stroke-width="0"/>\n' +
+      '      <path d="M 35.000000,60.0000000 L 52.5000000,77.500000 L 85.0000000,45.0000000"\n' +
+      '            fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>\n' +
+      '    </g>\n' +
+      '  </g>\n' +
+      '  <!-- 結束 -->\n' +
+      '</svg>\n';
+    els.input.dataset.filename = 'sample.svg';
+    run();
+    toast('已載入範例');
+  });
+
+  $('btn-preset-all').addEventListener('click', function () {
+    presetNames.forEach(function (n) { if (toggles[n]) toggles[n].checked = true; });
+    run();
+  });
+  $('btn-preset-none').addEventListener('click', function () {
+    presetNames.forEach(function (n) { if (toggles[n]) toggles[n].checked = false; });
+    run();
+  });
+  $('btn-preset-reset').addEventListener('click', function () {
+    Object.keys(toggles).forEach(function (n) {
+      toggles[n].checked = toggles[n].dataset.extra !== '1';
+    });
+    els.precision.value = '3'; $('out-precision').textContent = '3';
+    els.multipass.checked = true;
+    els.pretty.checked = false;
+    run();
+    toast('已回到 SVGO 預設設定');
+  });
+
+  // 拖放
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    els.paneIn.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      els.paneIn.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    els.paneIn.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (ev === 'dragleave' && els.paneIn.contains(e.relatedTarget)) return;
+      els.paneIn.classList.remove('is-dragging');
+    });
+  });
+  els.paneIn.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  loadSVGO().catch(function () { /* 錯誤已顯示在狀態列 */ });
+})();
+</script>
+</body>
+</html>
