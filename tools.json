@@ -223,5 +223,35 @@
 		"isNew": true,
 		"order": 15,
 		"updatedAt": "2026-08-26"
+    },
+	{
+		"id": "color-lab",
+		"name": "色彩工具組",
+		"name_en": "Color Lab",
+		"description": "WCAG 對比檢查與自動修正、HEX/RGB/HSL/OKLCH 互轉、感知均勻色階與配色、圖片取色，可整組套上色覺模擬。",
+		"path": "./tools/color-lab/",
+		"category": "utility",
+		"tags": ["color","wcag","contrast","accessibility","a11y","oklch","palette","design","colorblind"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 16,
+		"updatedAt": "2026-08-26"
+    },
+	{
+		"id": "encode-hash-lab",
+		"name": "編碼／雜湊工具箱",
+		"name_en": "Encode & Hash Lab",
+		"description": "Base64、URL、HTML 實體、Unicode、Hex 編解碼，SHA 家族雜湊與 HMAC，JWT 解碼與 UUID／隨機密碼產生，共 23 種操作。",
+		"path": "./tools/encode-hash-lab/",
+		"category": "utility",
+		"tags": ["base64","url","hash","sha256","hmac","jwt","uuid","password","encode","decode","hex","developer"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": false,
+		"isNew": true,
+		"order": 17,
+		"updatedAt": "2026-08-26"
     }
 ]
