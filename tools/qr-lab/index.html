@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QR 實驗室</title>
+<meta name="description" content="產生 QR 後實測它還能被解碼多少：模糊、縮小、低對比、遮擋、旋轉、雜訊逐軸掃描出斷點，並標註判定用的解碼器。也可以丟任何現成 QR 圖片進來驗屍。全部在瀏覽器完成。" />
+<link rel="stylesheet" href="libs/archlens-theme.css" />
+
+<!--
+  QR Lab — measure what stylising a QR code actually costs.
+
+  DESIGN CONTRACT (read before editing)
+
+  1. This tool is an INSTRUMENT. Every number it prints must name the decoder
+     that produced it. jsQR is not a phone. Measured 2026-08-26: jsQR decodes a
+     QR with NO quiet zone, which many real scanners refuse. Never print the
+     word "scannable" unqualified.
+
+  2. All degradations are implemented here in pure JS over ImageData, NOT via
+     ctx.filter / drawImage smoothing. Those are browser-dependent, and an
+     instrument that scores the same input differently per browser is broken.
+     The single exception is the JPEG axis, which must use the browser's
+     encoder and is labelled browser-dependent in the UI.
+
+  3. Any gate needs both controls. runSelfTest() decodes a clean render (must
+     pass) and a block-corrupted render (must fail). If either control comes
+     out wrong the report is suppressed — a checker that only ever passes is
+     not a checker.
+
+  4. Aggregation is WEAKEST-LINK (min), never a mean. A code fails in the field
+     if any single condition breaks it; averaging hides the one axis that
+     matters.
+
+  STYLE REGISTRY (extension point)
+
+    STYLES.push({
+      id:    'my-style',              // unique, kebab-case
+      label: '顯示名稱',
+      desc:  '一句話說明',
+      render: function (ctx, mx, o) { ... }
+    })
+
+  render() receives a 2D context, the matrix `mx` ({ n, isDark(r,c) }) and `o`:
+
+    o.scale, o.quiet, o.pixels     geometry
+    o.dark, o.light                CSS colours chosen by the user
+    o.rng()                        seeded PRNG — use it for ALL randomness so
+                                   the same input keeps producing the same art
+    o.paintBackground(ctx)         fill the canvas with the light colour
+    o.paintStructural(ctx)         draw finder / timing / alignment modules as
+                                   plain solid squares
+    o.eachData(fn)                 fn(x, y, row, col) over dark modules OUTSIDE
+                                   those patterns — the safe area to decorate
+    o.eachDark(fn)                 every dark module, if you really mean it
+    o.isStructural(r, c), o.isFinder(r, c)
+
+  The recommended shape is paintBackground -> paintStructural -> eachData.
+  Decorating the structural patterns is what made two of the shipped styles
+  undecodable during development; the self-test will catch it, but starting
+  from the safe shape saves the round trip. Adding a style is one object;
+  nothing else in the file needs to change.
+
+  Vendored:
+    libs/qrcode.min.js      davidshimjs/qrcodejs (kazuhikoarase QR core), copied
+                            from tools/QR-Code-Producer/libs/ in this repo.
+                            Matrix access: qr._oQRCode.isDark(r,c) / .getModuleCount()
+    libs/jsqr/jsQR.js       jsQR 1.4.0, Apache-2.0
+                            https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js
+-->
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+  .container { max-width: 1240px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { margin-bottom: 18px; }
+  .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .header h1 {
+    font-family: var(--al-font-display);
+    font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+    color: var(--al-ink); margin: 0;
+  }
+  .header p {
+    font-family: var(--al-font-body);
+    font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+  }
+  .header a { color: var(--al-accent); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--al-white);
+    border: 1px solid var(--al-border);
+    border-radius: var(--al-radius-lg);
+    box-shadow: var(--al-shadow-card);
+    padding: 16px;
+  }
+  .card + .card { margin-top: 14px; }
+  .card__title {
+    font-family: var(--al-font-body); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--al-slate-400); margin: 0 0 12px;
+  }
+
+  /* ── Layout ── */
+  .main { display: grid; grid-template-columns: 380px 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 940px) { .main { grid-template-columns: 1fr; } }
+
+  /* ── Form ── */
+  .field { margin-bottom: 13px; }
+  .field:last-child { margin-bottom: 0; }
+  .field__label {
+    display: block; font-family: var(--al-font-body);
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--al-slate-400); margin-bottom: 5px;
+  }
+  .field__hint {
+    font-family: var(--al-font-body); font-size: 11px;
+    color: var(--al-slate-400); margin-top: 4px; line-height: 1.5;
+  }
+  textarea.ctl { resize: vertical; min-height: 68px; font-family: var(--al-font-mono); }
+  .ctl {
+    width: 100%; padding: 8px 10px;
+    font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+    background: var(--al-bg-alt);
+    border: 1px solid var(--al-border);
+    border-radius: var(--al-radius-md);
+    outline: none;
+  }
+  .ctl:focus { border-color: var(--al-accent-border); background: var(--al-white); }
+  .ctl--color { height: 36px; padding: 3px; cursor: pointer; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 9px 16px; font-family: var(--al-font-body);
+    font-size: 13px; font-weight: 600; color: var(--al-white);
+    background: var(--al-accent); border: none;
+    border-radius: var(--al-radius-md); cursor: pointer;
+    box-shadow: var(--al-shadow-cta);
+  }
+  .btn:hover:not(:disabled) { background: var(--al-accent-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  .btn--ghost {
+    color: var(--al-slate-700); background: var(--al-bg-alt);
+    border: 1px solid var(--al-border); box-shadow: none;
+  }
+  .btn--ghost:hover:not(:disabled) { background: var(--al-white); border-color: var(--al-accent-border); }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+  /* ── Preview ── */
+  .preview { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .preview canvas {
+    max-width: 100%; height: auto; image-rendering: pixelated;
+    border: 1px solid var(--al-border); border-radius: var(--al-radius-sm);
+    background: #fff;
+  }
+  .preview__meta {
+    font-family: var(--al-font-mono); font-size: 11px;
+    color: var(--al-slate-500); text-align: center; line-height: 1.6;
+  }
+
+  /* ── Drop zone ── */
+  .drop {
+    border: 1.5px dashed var(--al-border); border-radius: var(--al-radius-md);
+    padding: 14px; text-align: center; cursor: pointer;
+    font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500);
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.is-over { border-color: var(--al-accent); background: var(--al-accent-soft); }
+
+  /* ── Verdict headline ── */
+  .verdict { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .verdict__score {
+    font-family: var(--al-font-display); font-size: 44px; font-weight: 800;
+    line-height: 1; letter-spacing: -0.03em;
+  }
+  .verdict__body { flex: 1; min-width: 200px; }
+  .verdict__label { font-family: var(--al-font-body); font-size: 15px; font-weight: 700; color: var(--al-ink); }
+  .verdict__sub {
+    font-family: var(--al-font-body); font-size: 12px;
+    color: var(--al-slate-500); margin-top: 3px; line-height: 1.6;
+  }
+  .s-good { color: var(--al-success); }
+  .s-warn { color: var(--al-warn-text); }
+  .s-bad  { color: var(--al-error-text); }
+
+  /* ── Axis table ── */
+  .axis { border-top: 1px solid var(--al-border-soft); padding: 11px 0; }
+  .axis:first-of-type { border-top: none; }
+  .axis__head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .axis__name { font-family: var(--al-font-body); font-size: 13px; font-weight: 700; color: var(--al-ink); }
+  .axis__val { font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700); margin-left: auto; }
+  .axis__desc {
+    font-family: var(--al-font-body); font-size: 11px;
+    color: var(--al-slate-400); margin-top: 3px; line-height: 1.5;
+  }
+  .bar {
+    position: relative; height: 7px; margin-top: 7px;
+    background: var(--al-bg-alt); border-radius: var(--al-radius-full); overflow: hidden;
+  }
+  .bar__fill { height: 100%; border-radius: var(--al-radius-full); transition: width .3s ease; }
+  .bar__ref {
+    position: absolute; top: -3px; width: 2px; height: 13px;
+    background: var(--al-slate-400); border-radius: 1px;
+  }
+  .f-good { background: var(--al-success); }
+  .f-warn { background: var(--al-warn-text); }
+  .f-bad  { background: var(--al-error-text); }
+
+  /* ── Notices ── */
+  .note {
+    font-family: var(--al-font-body); font-size: 12px; line-height: 1.65;
+    padding: 10px 12px; border-radius: var(--al-radius-md);
+    border: 1px solid var(--al-border-soft); background: var(--al-bg-alt);
+    color: var(--al-slate-700);
+  }
+  .note--warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+  .note--err  { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+  .note + .note { margin-top: 8px; }
+  .note code { font-family: var(--al-font-mono); font-size: 11px; }
+
+  /* ── Decoder panel ── */
+  .dec { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dec__item {
+    flex: 1; min-width: 175px; padding: 10px 12px;
+    border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+    background: var(--al-bg-alt);
+  }
+  .dec__name {
+    font-family: var(--al-font-body); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--al-slate-400); margin-bottom: 5px;
+  }
+  .dec__res {
+    font-family: var(--al-font-mono); font-size: 12px; color: var(--al-ink);
+    word-break: break-all; line-height: 1.5;
+  }
+
+  /* ── Progress ── */
+  .prog { height: 3px; background: var(--al-bg-alt); border-radius: var(--al-radius-full); overflow: hidden; margin-top: 10px; }
+  .prog__fill { height: 100%; background: var(--al-accent); width: 0%; transition: width .2s; }
+  .muted { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-400); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>QR 實驗室</h1>
+      <span class="muted">Scan-Robustness Lab</span>
+    </div>
+    <p>
+      別的工具讓 QR 變好看，這個工具告訴你變好看之後<strong>還剩多少餘裕</strong>。逐軸把碼推到解不出來為止，量出斷點。
+      只想快速生一張圖？用 <a href="../QR-Code-Producer/">QR 扣產生器</a>。
+    </p>
+  </header>
+
+  <div class="main">
+
+    <!-- ══ Left: input ══ -->
+    <div>
+      <section class="card">
+        <h2 class="card__title">輸入</h2>
+
+        <div class="field">
+          <label class="field__label" for="text">內容</label>
+          <textarea id="text" class="ctl" spellcheck="false">https://example.com/hello</textarea>
+        </div>
+
+        <div class="field row2">
+          <div>
+            <label class="field__label" for="ecc">容錯等級</label>
+            <select id="ecc" class="ctl">
+              <option value="L">L — 約 7%</option>
+              <option value="M" selected>M — 約 15%</option>
+              <option value="Q">Q — 約 25%</option>
+              <option value="H">H — 約 30%</option>
+            </select>
+          </div>
+          <div>
+            <label class="field__label" for="scale">模組邊長 (px)</label>
+            <input id="scale" class="ctl" type="number" min="2" max="24" step="1" value="8" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="quiet">靜區寬度（模組數）</label>
+          <input id="quiet" class="ctl" type="number" min="0" max="8" step="1" value="4" />
+          <div class="field__hint">
+            規格要求 4。設成 0 可以看到 jsQR 仍解得出、而多數手機掃不到的差距。
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="style">風格</label>
+          <select id="style" class="ctl"></select>
+          <div id="styleDesc" class="field__hint"></div>
+        </div>
+
+        <div class="field row2">
+          <div>
+            <label class="field__label" for="dark">深色模組</label>
+            <input id="dark" class="ctl ctl--color" type="color" value="#000000" />
+          </div>
+          <div>
+            <label class="field__label" for="light">淺色底</label>
+            <input id="light" class="ctl ctl--color" type="color" value="#ffffff" />
+          </div>
+        </div>
+
+        <div class="btnrow">
+          <button id="run" class="btn">開始量測</button>
+          <button id="png" class="btn btn--ghost">下載 PNG</button>
+        </div>
+        <div id="prog" class="prog hidden"><div id="progFill" class="prog__fill"></div></div>
+        <div id="progText" class="muted" style="margin-top:6px"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">驗屍：丟一張現成的 QR 進來</h2>
+        <div id="drop" class="drop">
+          點擊選檔，或把圖片拖進來<br />
+          <span style="font-size:11px">海報照片、客戶給的檔案、別的網站產的都可以</span>
+        </div>
+        <input id="file" type="file" accept="image/*" class="hidden" />
+        <div id="dropInfo" class="field__hint"></div>
+      </section>
+    </div>
+
+    <!-- ══ Right: preview + report ══ -->
+    <div>
+      <section class="card">
+        <h2 class="card__title">目前受測的圖</h2>
+        <div class="preview">
+          <canvas id="cv" width="296" height="296"></canvas>
+          <div id="meta" class="preview__meta"></div>
+        </div>
+      </section>
+
+      <section id="selftestBox" class="card hidden">
+        <h2 class="card__title">儀器自我檢查</h2>
+        <div id="selftest"></div>
+      </section>
+
+      <section id="resultBox" class="card hidden">
+        <h2 class="card__title">判決</h2>
+        <div id="verdict" class="verdict"></div>
+        <div id="axes" style="margin-top:14px"></div>
+      </section>
+
+      <section id="decBox" class="card hidden">
+        <h2 class="card__title">解碼器對照（未劣化的原圖）</h2>
+        <div id="dec" class="dec"></div>
+        <div id="decNote" style="margin-top:10px"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">這些數字怎麼來的</h2>
+        <div class="note">
+          每一軸都是把劣化強度逐步加大、每一步重新解碼，直到解不出來為止，回報<strong>斷點</strong>。
+          基準不是我發明的常數，而是<strong>同樣內容、同樣容錯等級的一張素碼</strong>實測出來的斷點——
+          所以分數回答的是「這些裝飾吃掉了多少餘裕」，素碼本身必然拿到 100。
+          總分取<strong>最弱的一軸</strong>，不是平均：現場只要有一個條件踩到就是掃不到。
+        </div>
+        <div class="note" style="margin-top:8px">
+          所有劣化都在本頁用 JavaScript 自己算（高斯模糊、面積平均縮放、加性雜訊等），
+          沒有用 <code>ctx.filter</code>，因為那會隨瀏覽器而異——量測工具不能換個瀏覽器就換個分數。
+          唯一例外是 JPEG 軸，必須用瀏覽器內建編碼器，已標註。
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="libs/qrcode.min.js"></script>
+<script src="libs/jsqr/jsQR.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ════════════════════════════════════════════════════════════════════
+  // 0. Small helpers
+  // ════════════════════════════════════════════════════════════════════
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /** Deterministic PRNG (mulberry32) — styles and the noise axis must be reproducible. */
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hashString(s) {
+    var h = 2166136261 >>> 0;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
+  function yieldToUI() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  /** WCAG relative luminance from 8-bit sRGB. Same maths as color-lab. */
+  function relLum(r, g, b) {
+    function lin(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+  function contrastRatio(l1, l2) {
+    var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  function newCanvas(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+  function imgDataToCanvas(img) {
+    var c = newCanvas(img.width, img.height);
+    c.getContext('2d').putImageData(img, 0, 0);
+    return c;
+  }
+  function cloneImageData(img) {
+    return new ImageData(new Uint8ClampedArray(img.data), img.width, img.height);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 1. QR matrix
+  // ════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build a module matrix from text. Returns { n, isDark(r,c) } or throws.
+   * qrcode.min.js exposes the model at ._oQRCode — private API, but verified
+   * against the canonical finder pattern in buildMatrix's own sanity check.
+   */
+  function buildMatrix(text, eccName) {
+    var host = document.createElement('div');
+    var qr = new QRCode(host, {
+      text: text,
+      correctLevel: QRCode.CorrectLevel[eccName]
+    });
+    var model = qr._oQRCode;
+    if (!model || typeof model.isDark !== 'function') {
+      throw new Error('編碼器沒有提供矩陣介面（qrcode.min.js 版本可能不符）');
+    }
+    var n = model.getModuleCount();
+
+    // Sanity check: the top-left finder pattern is fixed by the spec. If this
+    // does not match, the matrix we got is not a QR matrix and every number
+    // downstream would be meaningless.
+    var FINDER = '#######|#.....#|#.###.#|#.###.#|#.###.#|#.....#|#######';
+    var got = [];
+    for (var r = 0; r < 7; r++) {
+      var row = '';
+      for (var c = 0; c < 7; c++) row += model.isDark(r, c) ? '#' : '.';
+      got.push(row);
+    }
+    if (got.join('|') !== FINDER) {
+      throw new Error('矩陣自我檢查失敗：定位圖形不符合規格');
+    }
+
+    return {
+      n: n,
+      isDark: function (r, c) { return !!model.isDark(r, c); }
+    };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 2. Style registry  (extension point — see the contract at the top)
+  // ════════════════════════════════════════════════════════════════════
+
+  // ── colour helpers, shared by styles ──
+  function hexToRgb(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+    if (!m) return { r: 0, g: 0, b: 0 };
+    var v = parseInt(m[1], 16);
+    return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+  }
+  function rgbToCss(c) { return 'rgb(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ')'; }
+  function mix(a, b, t) {
+    return { r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t };
+  }
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /**
+   * Alignment-pattern centre coordinates by QR version (ISO/IEC 18004 Annex E).
+   * Index = version; each 5x5 pattern is centred on every (r,c) pair of the
+   * listed coordinates, except the three that would collide with a finder.
+   */
+  var ALIGN_COORDS = [
+    null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34],
+    [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50], [6, 30, 54], [6, 32, 58], [6, 34, 62],
+    [6, 26, 46, 66], [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78], [6, 30, 56, 82],
+    [6, 30, 58, 86], [6, 34, 62, 90],
+    [6, 28, 50, 72, 94], [6, 26, 50, 74, 98], [6, 30, 54, 78, 102], [6, 28, 54, 80, 106],
+    [6, 32, 58, 84, 110], [6, 30, 58, 86, 114], [6, 34, 62, 90, 118],
+    [6, 26, 50, 74, 98, 122], [6, 30, 54, 78, 102, 126], [6, 26, 52, 78, 104, 130],
+    [6, 30, 56, 82, 108, 134], [6, 34, 60, 86, 112, 138], [6, 30, 58, 86, 114, 142],
+    [6, 34, 62, 90, 118, 146],
+    [6, 30, 54, 78, 102, 126, 150], [6, 24, 50, 76, 102, 128, 154], [6, 28, 54, 80, 106, 132, 158],
+    [6, 32, 58, 84, 110, 136, 162], [6, 26, 54, 82, 110, 138, 166], [6, 30, 58, 86, 114, 142, 170]
+  ];
+
+  var STYLES = [];
+
+  STYLES.push({
+    id: 'classic',
+    label: '標準方塊',
+    desc: '規格原樣。所有風格的比較基準。',
+    render: function (ctx, mx, o) {
+      o.paintBackground(ctx);
+      ctx.fillStyle = o.dark;
+      o.eachDark(function (x, y) { ctx.fillRect(x, y, o.scale, o.scale); });
+    }
+  });
+
+  STYLES.push({
+    id: 'dots',
+    label: '圓點',
+    desc: '資料模組畫成圓點，定位／時序／校正圖形維持實心方塊。'
+        + '半徑 0.47 模組：實測 0.42 會讓覆蓋面積不足而完全解不出來，0.46 起才穩定。',
+    render: function (ctx, mx, o) {
+      o.paintBackground(ctx);
+      o.paintStructural(ctx);
+      ctx.fillStyle = o.dark;
+      var rad = o.scale * 0.47;
+      o.eachData(function (x, y) {
+        ctx.beginPath();
+        ctx.arc(x + o.scale / 2, y + o.scale / 2, rad, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  });
+
+  STYLES.push({
+    id: 'rounded',
+    label: '圓角連塊',
+    desc: '相鄰的模組連成一片並收圓角，看起來柔和且保留完整覆蓋面積。',
+    render: function (ctx, mx, o) {
+      o.paintBackground(ctx);
+      ctx.fillStyle = o.dark;
+      var s = o.scale, rad = s * 0.38;
+      o.eachDark(function (x, y, r, c) {
+        roundRectPath(ctx, x, y, s, s, rad);
+        ctx.fill();
+      });
+      // bridge the gaps so runs of modules read as one shape
+      o.eachDark(function (x, y, r, c) {
+        if (c + 1 < mx.n && mx.isDark(r, c + 1)) ctx.fillRect(x + s / 2, y, s, s);
+        if (r + 1 < mx.n && mx.isDark(r + 1, c)) ctx.fillRect(x, y + s / 2, s, s);
+      });
+    }
+  });
+
+  STYLES.push({
+    id: 'voxel',
+    label: '立體積木',
+    desc: '由正上方俯視的擠出方塊，帶高光與陰影邊。資料模組的覆蓋面積完全沒變，'
+        + '所以看起來立體但幾乎不損失餘裕——「看起來 3D」與「掃不到」是兩件事。'
+        + '斜角必須避開定位／時序圖形：實測把斜角從 0.22 縮到 0.12 仍然完全解不出來，'
+        + '問題從來不在斜角大小。',
+    render: function (ctx, mx, o) {
+      o.paintBackground(ctx);
+      o.paintStructural(ctx);
+      var s = o.scale, bev = Math.max(1, s * 0.22);
+      var dark = hexToRgb(o.dark), light = hexToRgb(o.light);
+      var top = rgbToCss(mix(dark, light, 0.38));
+      var bottom = rgbToCss(mix(dark, { r: 0, g: 0, b: 0 }, 0.35));
+      o.eachData(function (x, y) {
+        ctx.fillStyle = o.dark;
+        ctx.fillRect(x, y, s, s);
+        // top-left highlight
+        ctx.fillStyle = top;
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x + s, y);
+        ctx.lineTo(x + s - bev, y + bev); ctx.lineTo(x + bev, y + bev);
+        ctx.lineTo(x + bev, y + s - bev); ctx.lineTo(x, y + s);
+        ctx.closePath(); ctx.fill();
+        // bottom-right shade
+        ctx.fillStyle = bottom;
+        ctx.beginPath();
+        ctx.moveTo(x + s, y); ctx.lineTo(x + s, y + s); ctx.lineTo(x, y + s);
+        ctx.lineTo(x + bev, y + s - bev); ctx.lineTo(x + s - bev, y + s - bev);
+        ctx.lineTo(x + s - bev, y + bev);
+        ctx.closePath(); ctx.fill();
+      });
+    }
+  });
+
+  STYLES.push({
+    id: 'mosaic',
+    label: '馬賽克',
+    desc: '每個模組取用調色盤中的一個色階，同樣的輸入永遠得到同樣的圖。'
+        + '這是最接近「彩色藝術 QR」的做法，也是對比餘裕掉最多的做法。',
+    render: function (ctx, mx, o) {
+      var dark = hexToRgb(o.dark), light = hexToRgb(o.light);
+      var s = o.scale, px = o.pixels;
+      // light modules get a faint tint too, so the whole surface reads as art
+      for (var r = 0; r < mx.n + o.quiet * 2; r++) {
+        for (var c = 0; c < mx.n + o.quiet * 2; c++) {
+          ctx.fillStyle = rgbToCss(mix(light, dark, o.rng() * 0.06));
+          ctx.fillRect(c * s, r * s, s, s);
+        }
+      }
+      o.eachDark(function (x, y, r, c) {
+        var t = 0.72 + o.rng() * 0.28;              // keep every tile clearly dark
+        ctx.fillStyle = rgbToCss(mix(light, dark, t));
+        ctx.fillRect(x, y, s, s);
+      });
+      void px;
+    }
+  });
+
+  function getStyle(id) {
+    for (var i = 0; i < STYLES.length; i++) if (STYLES[i].id === id) return STYLES[i];
+    return STYLES[0];
+  }
+
+  /**
+   * Render a matrix through a style into a fresh canvas.
+   *
+   * `o` carries everything a style needs, including three helpers so that a new
+   * style never has to re-derive the quiet-zone offset or the finder geometry:
+   *   o.paintBackground(ctx)      fill the whole canvas with the light colour
+   *   o.eachDark(fn)              fn(x, y, row, col) for every dark module,
+   *                               x/y already offset by the quiet zone
+   *   o.isFinder(row, col)        inside one of the three finder patterns
+   */
+  function renderMatrix(mx, opts) {
+    var scale = opts.scale, quiet = opts.quiet;
+    var px = (mx.n + quiet * 2) * scale;
+
+    var o = {
+      scale: scale, quiet: quiet, pixels: px,
+      dark: opts.dark || '#000000', light: opts.light || '#ffffff',
+      rng: mulberry32(opts.seed || 1),
+      isFinder: function (r, c) {
+        var n = mx.n;
+        return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+      },
+      isStructural: function (r, c) {
+        if (o.isFinder(r, c)) return true;
+        if (r === 6 || c === 6) return true;                 // timing patterns
+        var version = (mx.n - 17) / 4;
+        var coords = ALIGN_COORDS[version] || [];
+        for (var i = 0; i < coords.length; i++) {
+          for (var j = 0; j < coords.length; j++) {
+            var ar = coords[i], ac = coords[j];
+            // skip the three alignment slots that collide with finders
+            if ((ar <= 8 && ac <= 8) || (ar <= 8 && ac >= mx.n - 9) || (ar >= mx.n - 9 && ac <= 8)) continue;
+            if (Math.abs(r - ar) <= 2 && Math.abs(c - ac) <= 2) return true;
+          }
+        }
+        return false;
+      },
+      paintBackground: function (ctx) {
+        ctx.fillStyle = o.light;
+        ctx.fillRect(0, 0, px, px);
+      },
+      eachDark: function (fn) {
+        for (var r = 0; r < mx.n; r++) {
+          for (var c = 0; c < mx.n; c++) {
+            if (mx.isDark(r, c)) fn((c + quiet) * scale, (r + quiet) * scale, r, c);
+          }
+        }
+      },
+      /** Dark modules OUTSIDE the structural patterns — the safe area to decorate. */
+      eachData: function (fn) {
+        o.eachDark(function (x, y, r, c) { if (!o.isStructural(r, c)) fn(x, y, r, c); });
+      },
+      /**
+       * Draw every structural dark module as a plain solid square.
+       *
+       * Measured 2026-08-26: the dot and voxel styles were undecodable until
+       * they did this. For voxel the bevel size was irrelevant — shrinking it
+       * from 0.22 to 0.12 still failed — because the real damage was to the
+       * finder and timing patterns, which is what a decoder locks onto first.
+       */
+      paintStructural: function (ctx) {
+        ctx.fillStyle = o.dark;
+        o.eachDark(function (x, y, r, c) {
+          if (o.isStructural(r, c)) ctx.fillRect(x, y, scale, scale);
+        });
+      }
+    };
+
+    var cv = newCanvas(px, px);
+    getStyle(opts.styleId || 'classic').render(cv.getContext('2d'), mx, o);
+    return cv;
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 3. Degradations — pure JS, deterministic, browser-independent
+  // ════════════════════════════════════════════════════════════════════
+
+  var D = {};
+
+  /** True separable Gaussian blur. sigma in pixels; radius = ceil(3*sigma). */
+  D.blur = function (img, sigma) {
+    if (sigma <= 0.01) return cloneImageData(img);
+    var w = img.width, h = img.height;
+    var rad = Math.ceil(sigma * 3), size = rad * 2 + 1;
+    var k = new Float32Array(size), sum = 0, i;
+    for (i = 0; i < size; i++) {
+      var d = i - rad;
+      k[i] = Math.exp(-(d * d) / (2 * sigma * sigma));
+      sum += k[i];
+    }
+    for (i = 0; i < size; i++) k[i] /= sum;
+
+    var src = img.data;
+    var tmp = new Float32Array(w * h * 3);
+    var out = new Uint8ClampedArray(src.length);
+    var x, y, ch, acc, j, sx, sy, idx;
+
+    // horizontal pass (clamped edges)
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        for (ch = 0; ch < 3; ch++) {
+          acc = 0;
+          for (j = 0; j < size; j++) {
+            sx = x + j - rad;
+            if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+            acc += src[(y * w + sx) * 4 + ch] * k[j];
+          }
+          tmp[(y * w + x) * 3 + ch] = acc;
+        }
+      }
+    }
+    // vertical pass
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        idx = (y * w + x) * 4;
+        for (ch = 0; ch < 3; ch++) {
+          acc = 0;
+          for (j = 0; j < size; j++) {
+            sy = y + j - rad;
+            if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
+            acc += tmp[(sy * w + x) * 3 + ch] * k[j];
+          }
+          out[idx + ch] = acc;
+        }
+        out[idx + 3] = 255;
+      }
+    }
+    return new ImageData(out, w, h);
+  };
+
+  /**
+   * Area-average (box filter) resample with a sub-pixel phase offset.
+   *
+   * The phase matters. Without it, a synthetic QR downscales almost losslessly
+   * because every module boundary lands exactly on a destination pixel edge —
+   * measured 2026-08-26: the size axis then survived all the way down to
+   * 1 px/module, which no real camera does. In a photograph the module grid
+   * never aligns with the sensor grid, so a non-zero phase is the realistic
+   * case, not an extra insult.
+   */
+  D.resample = function (img, nw, nh, phase) {
+    nw = Math.max(1, Math.round(nw)); nh = Math.max(1, Math.round(nh));
+    var w = img.width, h = img.height, src = img.data;
+    var out = new Uint8ClampedArray(nw * nh * 4);
+    var xr = w / nw, yr = h / nh;
+    var ph = (phase === undefined ? 0.5 : phase) * xr;   // in source pixels
+    for (var y = 0; y < nh; y++) {
+      var ys = y * yr + ph, ye = (y + 1) * yr + ph;
+      var y0 = Math.max(0, Math.floor(ys)), y1 = Math.min(h, Math.max(y0 + 1, Math.ceil(ye)));
+      for (var x = 0; x < nw; x++) {
+        var xs = x * xr + ph, xe = (x + 1) * xr + ph;
+        var x0 = Math.max(0, Math.floor(xs)), x1 = Math.min(w, Math.max(x0 + 1, Math.ceil(xe)));
+        var r = 0, g = 0, b = 0, cnt = 0;
+        for (var sy = y0; sy < y1; sy++) {
+          for (var sx = x0; sx < x1; sx++) {
+            var i = (sy * w + sx) * 4;
+            r += src[i]; g += src[i + 1]; b += src[i + 2]; cnt++;
+          }
+        }
+        var o = (y * nw + x) * 4;
+        out[o] = r / cnt; out[o + 1] = g / cnt; out[o + 2] = b / cnt; out[o + 3] = 255;
+      }
+    }
+    return new ImageData(out, nw, nh);
+  };
+
+  /** Pull every pixel toward mid-grey by factor k (k=1 unchanged, k=0 flat grey). */
+  D.contrast = function (img, k) {
+    var out = cloneImageData(img), d = out.data;
+    for (var i = 0; i < d.length; i += 4) {
+      d[i]     = 128 + (d[i]     - 128) * k;
+      d[i + 1] = 128 + (d[i + 1] - 128) * k;
+      d[i + 2] = 128 + (d[i + 2] - 128) * k;
+    }
+    return out;
+  };
+
+  /** Cover a centred square with `frac` of the CODE area (quiet zone excluded). */
+  D.occlude = function (img, frac, quietPx) {
+    var out = cloneImageData(img), d = out.data, w = img.width, h = img.height;
+    var codeW = w - quietPx * 2;
+    var side = Math.round(codeW * Math.sqrt(Math.max(0, frac)));
+    if (side <= 0) return out;
+    var x0 = Math.round((w - side) / 2), y0 = Math.round((h - side) / 2);
+    for (var y = y0; y < y0 + side && y < h; y++) {
+      if (y < 0) continue;
+      for (var x = x0; x < x0 + side && x < w; x++) {
+        if (x < 0) continue;
+        var i = (y * w + x) * 4;
+        d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = 255;
+      }
+    }
+    return out;
+  };
+
+  /**
+   * Solve the 8-parameter homography mapping four dst points to four src
+   * points, so we can inverse-sample. Returns [a,b,c,d,e,f,g,h] where
+   *   u = (a*x + b*y + c) / (g*x + h*y + 1)
+   *   v = (d*x + e*y + f) / (g*x + h*y + 1)
+   */
+  function solveHomography(dst, src) {
+    var M = [], i;
+    for (i = 0; i < 4; i++) {
+      var x = dst[i][0], y = dst[i][1], u = src[i][0], v = src[i][1];
+      M.push([x, y, 1, 0, 0, 0, -x * u, -y * u, u]);
+      M.push([0, 0, 0, x, y, 1, -x * v, -y * v, v]);
+    }
+    // Gaussian elimination with partial pivoting
+    for (i = 0; i < 8; i++) {
+      var piv = i;
+      for (var r = i + 1; r < 8; r++) if (Math.abs(M[r][i]) > Math.abs(M[piv][i])) piv = r;
+      var t = M[i]; M[i] = M[piv]; M[piv] = t;
+      if (Math.abs(M[i][i]) < 1e-12) return null;
+      for (var r2 = 0; r2 < 8; r2++) {
+        if (r2 === i) continue;
+        var f = M[r2][i] / M[i][i];
+        for (var c = i; c < 9; c++) M[r2][c] -= f * M[i][c];
+      }
+    }
+    var out = [];
+    for (i = 0; i < 8; i++) out.push(M[i][8] / M[i][i]);
+    return out;
+  }
+
+  /**
+   * Perspective tilt: rotate the code's plane about its vertical axis by `deg`
+   * and project it through a pinhole at distance 3x the code width.
+   *
+   * This replaces a plain in-plane rotation axis. Measured 2026-08-26: jsQR is
+   * fully invariant to in-plane rotation, so that axis reported "no breaking
+   * point" at every angle and carried no information. Tilt is the realistic
+   * version of the same worry — photographing a poster from an angle — and it
+   * does discriminate.
+   */
+  D.tilt = function (img, deg) {
+    if (deg <= 0.01) return cloneImageData(img);
+    var w = img.width, h = img.height, src = img.data;
+    var a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    var Dz = w * 3;                       // camera distance in source-pixel units
+
+    // project the four plane corners
+    var pts = [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
+    var proj = pts.map(function (p) {
+      var x3 = p[0] * ca, z3 = -p[0] * sa;
+      var k = Dz / (Dz + z3);
+      return [x3 * k, p[1] * k];
+    });
+    var xs = proj.map(function (p) { return p[0]; }), ys = proj.map(function (p) { return p[1]; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var nw = Math.max(8, Math.ceil(maxX - minX)), nh = Math.max(8, Math.ceil(maxY - minY));
+
+    var dstQuad = proj.map(function (p) { return [p[0] - minX, p[1] - minY]; });
+    var srcQuad = [[0, 0], [w, 0], [w, h], [0, h]];
+    var H = solveHomography(dstQuad, srcQuad);
+    if (!H) return cloneImageData(img);
+
+    var out = new Uint8ClampedArray(nw * nh * 4);
+    for (var y = 0; y < nh; y++) {
+      for (var x = 0; x < nw; x++) {
+        var den = H[6] * x + H[7] * y + 1;
+        var sx = (H[0] * x + H[1] * y + H[2]) / den;
+        var sy = (H[3] * x + H[4] * y + H[5]) / den;
+        var o = (y * nw + x) * 4;
+        if (!(sx >= 0 && sy >= 0 && sx < w - 1 && sy < h - 1)) {
+          out[o] = out[o + 1] = out[o + 2] = 255; out[o + 3] = 255;
+          continue;
+        }
+        var fx = Math.floor(sx), fy = Math.floor(sy), tx = sx - fx, ty = sy - fy;
+        for (var ch = 0; ch < 3; ch++) {
+          var p00 = src[(fy * w + fx) * 4 + ch],       p10 = src[(fy * w + fx + 1) * 4 + ch];
+          var p01 = src[((fy + 1) * w + fx) * 4 + ch], p11 = src[((fy + 1) * w + fx + 1) * 4 + ch];
+          out[o + ch] = p00 * (1 - tx) * (1 - ty) + p10 * tx * (1 - ty)
+                      + p01 * (1 - tx) * ty       + p11 * tx * ty;
+        }
+        out[o + 3] = 255;
+      }
+    }
+    return new ImageData(out, nw, nh);
+  };
+
+  /** Additive Gaussian noise, seeded so a re-run gives the same image. */
+  D.noise = function (img, sigma, seed) {
+    var out = cloneImageData(img), d = out.data;
+    var rng = mulberry32(seed || 12345);
+    for (var i = 0; i < d.length; i += 4) {
+      // Box-Muller
+      var u1 = Math.max(1e-9, rng()), u2 = rng();
+      var g = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * sigma;
+      d[i] += g; d[i + 1] += g; d[i + 2] += g;
+    }
+    return out;
+  };
+
+  // ════════════════════════════════════════════════════════════════════
+  // 4. Decoders
+  // ════════════════════════════════════════════════════════════════════
+
+  /** jsQR — always available, synchronous, deterministic. The measuring stick. */
+  function decodeJsQR(img) {
+    try {
+      var r = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      return r ? r.data : null;
+    } catch (e) { return null; }
+  }
+
+  var nativeDetector = null, nativeChecked = false;
+  async function getNativeDetector() {
+    if (nativeChecked) return nativeDetector;
+    nativeChecked = true;
+    try {
+      if (!('BarcodeDetector' in window)) return null;
+      var formats = await window.BarcodeDetector.getSupportedFormats();
+      if (formats.indexOf('qr_code') === -1) return null;
+      nativeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    } catch (e) { nativeDetector = null; }
+    return nativeDetector;
+  }
+
+  async function decodeNative(img) {
+    var det = await getNativeDetector();
+    if (!det) return undefined;              // undefined = unavailable, null = failed to decode
+    try {
+      var res = await det.detect(imgDataToCanvas(img));
+      return (res && res.length) ? res[0].rawValue : null;
+    } catch (e) { return null; }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 5. Instrument self-test  (both controls, per the contract)
+  // ════════════════════════════════════════════════════════════════════
+
+  function runSelfTest(mx, opts) {
+    var clean = renderMatrix(mx, opts);
+    var cleanImg = clean.getContext('2d').getImageData(0, 0, clean.width, clean.height);
+
+    // Negative control: flip a contiguous block far larger than ECC can repair.
+    var brokenMx = {
+      n: mx.n,
+      isDark: function (r, c) {
+        var lo = Math.floor(mx.n * 0.35), hi = Math.floor(mx.n * 0.80);
+        var inBlock = r > lo && r < hi && c > lo && c < hi;
+        return inBlock ? !mx.isDark(r, c) : mx.isDark(r, c);
+      }
+    };
+    var broken = renderMatrix(brokenMx, opts);
+    var brokenImg = broken.getContext('2d').getImageData(0, 0, broken.width, broken.height);
+
+    return {
+      positive: decodeJsQR(cleanImg),
+      negative: decodeJsQR(brokenImg),
+      cleanImg: cleanImg
+    };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 6. Sweep engine
+  // ════════════════════════════════════════════════════════════════════
+
+  /**
+   * Walk `amount` from easy to hard until decoding fails, then bisect the
+   * bracket. Decoding is not perfectly monotonic, so the coarse scan finds the
+   * FIRST failure and the bisection is confined to that bracket; the returned
+   * threshold is the last amount that still decoded.
+   */
+  async function sweep(cfg) {
+    var lo = cfg.from, hi = cfg.to, steps = cfg.steps || 12;
+    var lastOK = null, firstFail = null;
+
+    for (var i = 0; i <= steps; i++) {
+      var amt = lo + (hi - lo) * (i / steps);
+      var img = cfg.apply(amt);
+      var ok = decodeJsQR(img) === cfg.expect;
+      if (ok) { lastOK = amt; }
+      else { firstFail = amt; break; }
+      if (i % 3 === 0) await yieldToUI();
+    }
+
+    if (firstFail === null) return { threshold: hi, capped: true };   // survived everything
+    if (lastOK === null)  return { threshold: lo, floored: true };    // failed immediately
+
+    // bisect between lastOK and firstFail
+    var a = lastOK, b = firstFail;
+    for (var k = 0; k < 6; k++) {
+      var mid = (a + b) / 2;
+      if (decodeJsQR(cfg.apply(mid)) === cfg.expect) a = mid; else b = mid;
+    }
+    return { threshold: a, capped: false };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 7. Axis definitions
+  //
+  // Axes carry NO reference constants. An earlier version set the occlusion
+  // reference to the ECC level's nominal capacity (15% at M); a clean,
+  // completely unstyled QR then measured 7.9% and scored "insufficient
+  // margin" — the invented constant was wrong, not the code under test.
+  //
+  // The reference is now MEASURED: the same axes are run against a plain
+  // spec-compliant render of the same content and ECC level, and every number
+  // is reported relative to that. A plain code therefore scores 100 by
+  // construction, and the score answers the only question worth asking —
+  // how much margin did the decoration cost?
+  // ════════════════════════════════════════════════════════════════════
+
+  var AXES = [
+    {
+      key: 'blur', name: '模糊', better: 'higher',
+      desc: '相機沒對到焦、或印刷暈開。以模組為單位，所以與圖片大小無關。',
+      from: 0, to: 2.5, steps: 12,
+      fmt: function (v) { return 'σ ' + v.toFixed(2) + ' 模組'; },
+      apply: function (img, amt, geo) { return D.blur(img, amt * geo.scale); }
+    },
+    {
+      key: 'size', name: '縮小 / 拍攝距離', better: 'lower',
+      desc: '拍到的畫面裡每個模組剩幾像素才還解得出來。越小越好。'
+          + '縮放時帶半像素相位，因為真實照片的模組格線不會對齊感光元件格線。',
+      from: 12, to: 1, steps: 14,
+      fmt: function (v) { return v.toFixed(2) + ' px/模組'; },
+      apply: function (img, amt, geo) {
+        var totalModules = img.width / geo.scale;
+        var target = totalModules * amt;
+        return D.resample(img, target, target, 0.5);
+      }
+    },
+    {
+      key: 'contrast', name: '對比', better: 'lower',
+      desc: '深淺模組之間的 WCAG 對比比值降到多低還解得出來。越低越好。',
+      from: 1, to: 0.02, steps: 14,
+      fmt: function (v) { return v.toFixed(2) + ':1'; },
+      apply: function (img, amt) { return D.contrast(img, amt); },
+      // the swept amount is a k factor; report the contrast ratio it produced
+      translate: function (amt, img) {
+        var out = D.contrast(img, amt), d = out.data, minL = 1, maxL = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          var L = relLum(d[i], d[i + 1], d[i + 2]);
+          if (L < minL) minL = L;
+          if (L > maxL) maxL = L;
+        }
+        return contrastRatio(maxL, minL);
+      }
+    },
+    {
+      key: 'occlusion', name: '遮擋', better: 'higher',
+      desc: '中央被擋掉多少面積還救得回來（放 logo 的位置）。'
+          + '實測值通常明顯低於容錯等級的名目百分比，因為連續一整塊比分散的錯誤難救得多。',
+      from: 0, to: 0.45, steps: 14,
+      fmt: function (v) { return (v * 100).toFixed(1) + '%'; },
+      apply: function (img, amt, geo) { return D.occlude(img, amt, geo.quietPx); }
+    },
+    {
+      key: 'tilt', name: '透視傾斜', better: 'higher',
+      desc: '斜著拍海報。繞垂直軸傾斜，鏡頭距離設為碼寬的 3 倍。',
+      from: 0, to: 80, steps: 12,
+      fmt: function (v) { return v.toFixed(1) + '°'; },
+      apply: function (img, amt) { return D.tilt(img, amt); }
+    },
+    {
+      key: 'noise', name: '雜訊', better: 'higher',
+      desc: '暗處拍照的顆粒。加性高斯雜訊，固定亂數種子所以可重現。',
+      from: 0, to: 110, steps: 12,
+      fmt: function (v) { return 'σ ' + v.toFixed(1) + '/255'; },
+      apply: function (img, amt) { return D.noise(img, amt, 20260826); }
+    }
+  ];
+
+  var ECC_NOMINAL = { L: 7, M: 15, Q: 25, H: 30 };
+
+  /** Run one axis against one image. Returns { value, capped, floored }. */
+  async function measureAxis(axis, img, geo, expect) {
+    var r = await sweep({
+      from: axis.from, to: axis.to, steps: axis.steps, expect: expect,
+      apply: function (amt) { return axis.apply(img, amt, geo); }
+    });
+    var value = axis.translate ? axis.translate(r.threshold, img) : r.threshold;
+    return { value: value, capped: !!r.capped, floored: !!r.floored };
+  }
+
+  /**
+   * Estimate module geometry from a decoded image. Needed for dropped files,
+   * where we know neither the module count nor the pixel scale.
+   */
+  function estimateGeometry(img) {
+    var r;
+    try { r = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' }); }
+    catch (e) { return null; }
+    if (!r || !r.location || typeof r.version !== 'number') return null;
+    var L = r.location;
+    var dx = L.topRightCorner.x - L.topLeftCorner.x;
+    var dy = L.topRightCorner.y - L.topLeftCorner.y;
+    var codeW = Math.sqrt(dx * dx + dy * dy);
+    var n = 17 + 4 * r.version;
+    if (!(codeW > 0) || !(n > 0)) return null;
+    return {
+      n: n,
+      scale: codeW / n,
+      quietPx: Math.max(0, (img.width - codeW) / 2),
+      data: r.data
+    };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 8. UI
+  // ════════════════════════════════════════════════════════════════════
+
+  var state = { mx: null, opts: null, baseImg: null, expect: null, source: 'generated' };
+
+  function readOpts() {
+    return {
+      scale: Math.max(2, Math.min(24, parseInt($('scale').value, 10) || 8)),
+      quiet: Math.max(0, Math.min(8, parseInt($('quiet').value, 10) || 0)),
+      styleId: $('style').value || 'classic',
+      dark: $('dark').value || '#000000',
+      light: $('light').value || '#ffffff',
+      seed: hashString($('text').value || '')
+    };
+  }
+
+  /** True when the current settings ARE the plain reference render. */
+  function isPlainConfig(o) {
+    return o.styleId === 'classic' && o.quiet === 4
+      && o.dark.toLowerCase() === '#000000' && o.light.toLowerCase() === '#ffffff';
+  }
+
+  function drawPreview(img) {
+    var cv = $('cv');
+    cv.width = img.width; cv.height = img.height;
+    cv.getContext('2d').putImageData(img, 0, 0);
+  }
+
+  function refresh() {
+    var text = $('text').value;
+    if (!text) { $('meta').textContent = '請先輸入內容'; return; }
+    try {
+      var opts = readOpts();
+      var mx = buildMatrix(text, $('ecc').value);
+      var cv = renderMatrix(mx, opts);
+      var img = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
+      state.mx = mx; state.opts = opts; state.baseImg = img;
+      state.expect = text; state.source = 'generated';
+      drawPreview(img);
+      var version = (mx.n - 17) / 4;
+      $('meta').textContent = '版本 ' + version + '　·　' + mx.n + ' × ' + mx.n + ' 模組　·　'
+        + img.width + ' × ' + img.height + ' px　·　容錯 ' + $('ecc').value;
+      $('dropInfo').textContent = '';
+    } catch (e) {
+      $('meta').textContent = '';
+      showError(e.message || String(e));
+    }
+  }
+
+  function showError(msg) {
+    $('resultBox').classList.remove('hidden');
+    $('verdict').innerHTML = '';
+    $('axes').innerHTML = '<div class="note note--err">' + escapeHtml(msg) + '</div>';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  async function analyse() {
+    if (!state.baseImg) { refresh(); }
+    if (!state.baseImg) return;
+
+    var btn = $('run');
+    btn.disabled = true; btn.textContent = '量測中…';
+    $('prog').classList.remove('hidden');
+    $('progFill').style.width = '0%';
+
+    try {
+      // ── decoder panel on the undegraded image ──
+      var jsqrRes = decodeJsQR(state.baseImg);
+      var nativeRes = await decodeNative(state.baseImg);
+
+      // Render the decoder panel BEFORE any early return. Bailing out first
+      // leaves the previous run's result sitting next to a fresh error, which
+      // reads as if the failed image had decoded.
+      renderDecoders(jsqrRes, nativeRes);
+
+      if (state.source === 'dropped') {
+        state.expect = jsqrRes !== null ? jsqrRes : (nativeRes || null);
+        if (!state.expect) {
+          $('selftestBox').classList.add('hidden');
+          showError('這張圖連未劣化的狀態都解不出來，沒有可量測的餘裕。');
+          return;
+        }
+      }
+
+      // ── instrument self-test (generated codes only; needs a matrix) ──
+      $('selftestBox').classList.remove('hidden');
+      if (state.source === 'generated') {
+        var st = runSelfTest(state.mx, state.opts);
+        var posOK = st.positive === state.expect;
+        var negOK = st.negative === null;
+        $('selftest').innerHTML =
+          '<div class="note' + (posOK && negOK ? '' : ' note--err') + '">'
+          + '正對照（乾淨的碼必須解得出）：<strong>' + (posOK ? '通過' : '失敗') + '</strong><br />'
+          + '負對照（大面積破壞必須解不出）：<strong>' + (negOK ? '通過' : '失敗') + '</strong>'
+          + (posOK && negOK ? '' : '<br />儀器判定不可信，以下數字已停止產出。')
+          + '</div>';
+        if (!posOK || !negOK) {
+          $('resultBox').classList.add('hidden');
+          return;
+        }
+      } else {
+        $('selftest').innerHTML =
+          '<div class="note">外部圖片沒有已知的正確矩陣，無法做負對照。'
+          + '以下數字建立在「原圖解出的內容即為正解」這個假設上。</div>';
+      }
+
+      // ── geometry of the image under test ──
+      var geo;
+      if (state.source === 'generated') {
+        geo = {
+          n: state.mx.n,
+          scale: state.opts.scale,
+          quietPx: state.opts.quiet * state.opts.scale
+        };
+      } else {
+        geo = estimateGeometry(state.baseImg);
+        if (!geo) { showError('解得出內容，但量不出模組幾何，無法定義各軸的單位。'); return; }
+      }
+
+      // ── the measured reference: a plain, spec-compliant code, same content ──
+      var ecc = $('ecc').value;
+      var baseScale = state.source === 'generated'
+        ? state.opts.scale
+        : Math.max(2, Math.min(24, Math.round(geo.scale)));
+      var baseOpts = { scale: baseScale, quiet: 4, styleId: 'classic', seed: 1 };
+      var baseMx = buildMatrix(state.expect, ecc);
+      var baseCv = renderMatrix(baseMx, baseOpts);
+      var baseImg = baseCv.getContext('2d').getImageData(0, 0, baseCv.width, baseCv.height);
+      var baseGeo = { n: baseMx.n, scale: baseScale, quietPx: 4 * baseScale };
+
+      // If the user's render IS the plain reference, one pass is enough.
+      var isPlain = state.source === 'generated' && isPlainConfig(state.opts);
+
+      var total = AXES.length * (isPlain ? 1 : 2), done = 0;
+      function tick(name) {
+        $('progText').textContent = '量測「' + name + '」…（' + (done + 1) + '/' + total + '）';
+        $('progFill').style.width = ((done / total) * 100).toFixed(0) + '%';
+        done++;
+      }
+
+      var results = [];
+      for (var i = 0; i < AXES.length; i++) {
+        var ax = AXES[i];
+        tick(ax.name);
+        await yieldToUI();
+        var mine = await measureAxis(ax, state.baseImg, geo, state.expect);
+        var ref;
+        if (isPlain) {
+          ref = mine;
+        } else {
+          tick(ax.name + '（基準）');
+          await yieldToUI();
+          ref = await measureAxis(ax, baseImg, baseGeo, state.expect);
+        }
+        results.push({ axis: ax, mine: mine, ref: ref });
+      }
+      $('progFill').style.width = '100%';
+      renderReport(results, {
+        isPlain: isPlain,
+        source: state.source,
+        // jsQR does not report the error-correction level, so for a dropped
+        // image we genuinely do not know it. Printing the dropdown's level
+        // there would be asserting something we cannot determine.
+        eccNominal: state.source === 'generated' ? (ECC_NOMINAL[ecc] || 15) : null,
+        eccLabel: ecc
+      });
+
+    } catch (e) {
+      showError('量測失敗：' + (e.message || String(e)));
+    } finally {
+      btn.disabled = false; btn.textContent = '開始量測';
+      $('progText').textContent = '';
+      setTimeout(function () { $('prog').classList.add('hidden'); }, 400);
+    }
+  }
+
+  function renderDecoders(jsqrRes, nativeRes) {
+    $('decBox').classList.remove('hidden');
+    function cell(name, val, note) {
+      var body;
+      if (val === undefined) body = '<span class="muted">此瀏覽器不提供</span>';
+      else if (val === null) body = '<span class="s-bad">解不出</span>';
+      else body = escapeHtml(val.length > 90 ? val.slice(0, 90) + '…' : val);
+      return '<div class="dec__item"><div class="dec__name">' + name + '</div>'
+           + '<div class="dec__res">' + body + '</div>'
+           + (note ? '<div class="field__hint">' + note + '</div>' : '') + '</div>';
+    }
+    $('dec').innerHTML =
+      cell('jsQR 1.4.0（本站內建）', jsqrRes, '所有斷點都由這支解碼器判定')
+      + cell('BarcodeDetector（瀏覽器原生）', nativeRes, '較接近手機實際行為');
+
+    var noteHtml = '';
+    if (nativeRes === undefined) {
+      noteHtml = '<div class="note">這個瀏覽器沒有原生 <code>BarcodeDetector</code>（Firefox 與 Safari 目前都沒有），'
+        + '所以只有一把尺。在 Chrome / Edge 開啟本頁可以取得第二個獨立判定。</div>';
+    } else if (jsqrRes !== nativeRes) {
+      noteHtml = '<div class="note note--warn">兩支解碼器結論不同。這本身就是資訊——'
+        + '代表這張碼正落在「有些掃描器讀得到、有些讀不到」的邊界上。</div>';
+    } else {
+      noteHtml = '<div class="note">兩支獨立解碼器結論一致。</div>';
+    }
+    $('decNote').innerHTML = noteHtml;
+  }
+
+  function renderReport(results, ctx) {
+    $('resultBox').classList.remove('hidden');
+
+    var html = '', weakest = null, weakestRatio = Infinity;
+    var MAX_BAR = 2.0;   // a ratio of 2.0x or better fills the bar
+
+    results.forEach(function (item) {
+      var ax = item.axis, mine = item.mine, ref = item.ref;
+      var ratio;
+      if (ax.better === 'higher') {
+        ratio = mine.value / Math.max(1e-6, ref.value);
+      } else {
+        ratio = ref.value / Math.max(1e-6, mine.value);
+      }
+      if (!isFinite(ratio)) ratio = 1;
+      if (ratio < weakestRatio) { weakestRatio = ratio; weakest = ax; }
+
+      var cls = ratio >= 0.95 ? 'good' : (ratio >= 0.75 ? 'warn' : 'bad');
+      var pct = Math.max(3, Math.min(100, (ratio / MAX_BAR) * 100));
+      var refPct = (1 / MAX_BAR) * 100;
+
+      var valTxt = ax.fmt(mine.value) + (mine.capped ? '（未測到斷點）' : '');
+      var refTxt = ctx.isPlain
+        ? ''
+        : '　·　素碼 ' + ax.fmt(ref.value) + '　·　' + ratio.toFixed(2) + '×';
+
+      // The occlusion axis is where the nominal ECC number misleads people, so
+      // print the comparison right where they will look for it — but only when
+      // the level is actually known.
+      var extra = '';
+      if (ax.key === 'occlusion') {
+        extra = ctx.eccNominal !== null
+          ? '　容錯等級 ' + ctx.eccLabel + ' 的名目值為 ' + ctx.eccNominal + '%，實測 '
+            + (mine.value * 100).toFixed(1) + '%。'
+          : '　這張外部圖片的容錯等級無法從解碼結果判定，所以不列名目值。';
+      }
+
+      html += '<div class="axis">'
+        + '<div class="axis__head">'
+        +   '<span class="axis__name">' + ax.name + '</span>'
+        +   '<span class="axis__val s-' + cls + '">' + valTxt + refTxt + '</span>'
+        + '</div>'
+        + '<div class="bar">'
+        +   '<div class="bar__fill f-' + cls + '" style="width:' + pct.toFixed(1) + '%"></div>'
+        +   '<div class="bar__ref" style="left:' + refPct.toFixed(1) + '%"></div>'
+        + '</div>'
+        + '<div class="axis__desc">' + ax.desc + extra + '</div>'
+        + '</div>';
+    });
+
+    $('axes').innerHTML = html;
+
+    var score = Math.max(0, Math.min(100, Math.round(weakestRatio * 100)));
+    var sCls = score >= 90 ? 'good' : (score >= 70 ? 'warn' : 'bad');
+
+    var label, sub;
+    if (ctx.isPlain) {
+      label = '這就是基準本身';
+      sub = '目前的設定是一張規格標準的素碼，所以它<strong>依定義</strong>拿 100 分——'
+          + '這不是量測結果，是校準點。改動靜區、容錯等級，或之後套上風格，'
+          + '分數才會顯示你付出的代價。上面每一軸的絕對斷點仍然是實測值。';
+    } else {
+      label = (score >= 90 ? '幾乎沒有損失' : (score >= 70 ? '有可觀損失' : '損失嚴重'))
+            + '　·　最弱的一軸是「' + weakest.name + '」';
+      sub = '分數 = 最弱一軸相對素碼的比值 × 100。取最小值而非平均，'
+          + '因為現場只要一個條件踩到就掃不到。'
+          + (ctx.source === 'dropped'
+              ? '這張是外部圖片，比值同時包含了拍攝／壓縮的損失，不只是裝飾的代價；'
+                + '而且素碼是用左邊選單的容錯等級 ' + ctx.eccLabel
+                + ' 產生的，若這張圖本身用的是別的等級，比值就不具可比性——'
+                + '解碼結果不會告訴我們它的等級。'
+              : '');
+    }
+
+    $('verdict').innerHTML =
+      '<div class="verdict__score s-' + sCls + '">' + score + '</div>'
+      + '<div class="verdict__body">'
+      +   '<div class="verdict__label">' + label + '</div>'
+      +   '<div class="verdict__sub">' + sub
+      +     ' <strong>所有斷點皆由 jsQR 1.4.0 判定</strong>，不等於任何一支特定手機掃描器的行為。'
+      +   '</div>'
+      + '</div>';
+  }
+
+  // ── dropped image path ──
+  function loadImageFile(file) {
+    if (!file || !/^image\//.test(file.type)) {
+      $('dropInfo').textContent = '請選擇圖片檔。';
+      return;
+    }
+    createImageBitmap(file).then(function (bmp) {
+      var cv = newCanvas(bmp.width, bmp.height);
+      cv.getContext('2d').drawImage(bmp, 0, 0);
+      var img = cv.getContext('2d').getImageData(0, 0, bmp.width, bmp.height);
+      state.baseImg = img; state.mx = null; state.source = 'dropped'; state.expect = null;
+      state.opts = { scale: 1, quiet: 0, styleId: 'classic', seed: 1 };
+      drawPreview(img);
+      $('meta').textContent = file.name + '　·　' + bmp.width + ' × ' + bmp.height + ' px';
+      $('dropInfo').textContent = '已載入。按「開始量測」進行驗屍。';
+      $('selftestBox').classList.add('hidden');
+      $('resultBox').classList.add('hidden');
+      $('decBox').classList.add('hidden');
+    }).catch(function (e) {
+      $('dropInfo').textContent = '無法讀取這張圖：' + (e.message || e);
+    });
+  }
+
+  function downloadPng() {
+    var cv = $('cv');
+    cv.toBlob(function (blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'qr-lab.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }, 'image/png');
+  }
+
+  // ── wiring ──
+  // Populate the style picker from the registry, so adding a style really is
+  // one object and nothing else.
+  $('style').innerHTML = STYLES.map(function (s) {
+    return '<option value="' + s.id + '">' + escapeHtml(s.label) + '</option>';
+  }).join('');
+  function syncStyleDesc() {
+    var s = getStyle($('style').value);
+    $('styleDesc').textContent = s.desc || '';
+  }
+
+  ['text', 'ecc', 'scale', 'quiet', 'style', 'dark', 'light'].forEach(function (id) {
+    $(id).addEventListener('input', refresh);
+    $(id).addEventListener('change', refresh);
+  });
+  $('style').addEventListener('change', syncStyleDesc);
+  syncStyleDesc();
+  $('run').addEventListener('click', analyse);
+  $('png').addEventListener('click', downloadPng);
+  $('drop').addEventListener('click', function () { $('file').click(); });
+  $('file').addEventListener('change', function (e) { loadImageFile(e.target.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    $('drop').addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.add('is-over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    $('drop').addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.remove('is-over'); });
+  });
+  $('drop').addEventListener('drop', function (e) {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) loadImageFile(e.dataTransfer.files[0]);
+  });
+
+  // Sandbox notice: the lobby preview iframe has no allow-downloads.
+  try {
+    if (window.self !== window.top) {
+      $('png').title = '在大廳預覽中無法下載，請開新分頁使用';
+    }
+  } catch (e) { /* cross-origin access to top is expected to throw */ }
+
+  refresh();
+})();
+</script>
+</body>
+</html>

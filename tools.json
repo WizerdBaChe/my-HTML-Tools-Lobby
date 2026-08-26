@@ -217,7 +217,7 @@
 		"path": "./tools/svg-optimizer/",
 		"category": "image",
 		"tags": ["svg","optimize","svgo","minify","vector","image","web"],
-		"supportsIframe": false,
+		"supportsIframe": true,
 		"status": "ready",
 		"featured": false,
 		"isNew": true,
@@ -252,6 +252,21 @@
 		"featured": false,
 		"isNew": true,
 		"order": 17,
+		"updatedAt": "2026-08-26"
+    },
+	{
+		"id": "qr-lab",
+		"name": "QR 實驗室",
+		"name_en": "QR Scan-Robustness Lab",
+		"description": "產生 QR 後實測它還剩多少餘裕：模糊、縮小、低對比、遮擋、透視傾斜、雜訊逐軸掃出斷點，並與同內容的素碼比對出裝飾的代價。也可以丟現成的 QR 圖片進來驗屍。",
+		"path": "./tools/qr-lab/",
+		"category": "utility",
+		"tags": ["qr","scan","decode","robustness","contrast","accessibility","image","developer"],
+		"supportsIframe": true,
+		"status": "ready",
+		"featured": true,
+		"isNew": true,
+		"order": 18,
 		"updatedAt": "2026-08-26"
     }
 ]
