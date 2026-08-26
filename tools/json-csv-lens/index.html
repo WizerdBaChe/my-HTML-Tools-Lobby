@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON / CSV 檢視轉換器</title>
+  <meta name="description" content="JSON 格式化、樹狀檢視、CSV 表格檢視與 JSON ↔ CSV 互轉，全部在瀏覽器完成，不上傳任何資料。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    /* 版面結構（顏色/字體/圓角交給 archlens-theme） */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1180px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 22px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      padding: 12px; margin-bottom: 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .toolbar__sep { width: 1px; height: 22px; background: var(--al-border); margin: 0 2px; }
+    .toolbar__spacer { flex: 1 1 auto; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label {
+      font-family: var(--al-font-body); font-size: 12px;
+      color: var(--al-slate-500); white-space: nowrap;
+    }
+    select, input[type="text"] {
+      font-family: var(--al-font-body); font-size: 13px;
+      color: var(--al-ink); background: var(--al-white);
+      border: 1px solid var(--al-border); border-radius: var(--al-radius-md);
+      padding: 6px 8px; outline: none;
+    }
+    select:focus, input[type="text"]:focus { border-color: var(--al-accent); }
+    input[type="text"] { width: 190px; }
+
+    /* ── Layout ── */
+    .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+    @media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+
+    .pane {
+      display: flex; flex-direction: column; min-width: 0;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+      overflow: hidden;
+    }
+    .pane__head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--al-border-soft);
+      background: var(--al-bg-alt);
+      flex-wrap: wrap;
+    }
+    .pane__title {
+      font-family: var(--al-font-body); font-size: 12px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase; color: var(--al-slate-700);
+      margin: 0;
+    }
+    .pane__meta {
+      font-family: var(--al-font-mono); font-size: 11px;
+      color: var(--al-slate-400); margin-left: auto;
+    }
+    .pane__body { position: relative; flex: 1 1 auto; min-height: 420px; display: flex; }
+
+    textarea {
+      flex: 1 1 auto; width: 100%; resize: none;
+      font-family: var(--al-font-mono); font-size: 13px; line-height: 1.65;
+      color: var(--al-slate-700); background: var(--al-white);
+      border: 0; outline: none; padding: 14px;
+      tab-size: 2;
+    }
+
+    .output {
+      flex: 1 1 auto; overflow: auto; padding: 14px;
+      font-family: var(--al-font-mono); font-size: 13px; line-height: 1.65;
+    }
+
+    /* ── Tree view ── */
+    .tree { font-family: var(--al-font-mono); font-size: 13px; line-height: 1.6; }
+    .tree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px dashed var(--al-border); }
+    .tree > ul { padding-left: 0; border-left: 0; }
+    .tree li { position: relative; padding: 1px 0; }
+    .tw-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; margin-right: 4px; padding: 0;
+      font-size: 10px; line-height: 1; cursor: pointer;
+      color: var(--al-slate-500); background: var(--al-bg-alt);
+      border: 1px solid var(--al-border); border-radius: 4px;
+      font-family: var(--al-font-mono);
+    }
+    .tw-toggle:hover { color: var(--al-accent); border-color: var(--al-accent-border); background: var(--al-accent-soft); }
+    .tw-spacer { display: inline-block; width: 18px; }
+    .tw-key { color: var(--al-accent); }
+    .tw-key:hover { text-decoration: underline; cursor: copy; }
+    .tw-idx { color: var(--al-slate-400); }
+    .tw-colon { color: var(--al-slate-400); margin: 0 4px 0 1px; }
+    .tw-str { color: #047857; word-break: break-all; }
+    .tw-num { color: #B45309; }
+    .tw-bool { color: #7C3AED; }
+    .tw-null { color: var(--al-slate-400); font-style: italic; }
+    .tw-count { color: var(--al-slate-400); font-size: 11px; margin-left: 6px; }
+    .tw-collapsed > ul { display: none; }
+
+    /* ── Table view ── */
+    .tablewrap { flex: 1 1 auto; overflow: auto; }
+    table { border-collapse: collapse; width: max-content; min-width: 100%; font-family: var(--al-font-mono); font-size: 12.5px; }
+    thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: var(--al-bg-alt); color: var(--al-slate-700);
+      text-align: left; font-weight: 600; white-space: nowrap;
+      padding: 8px 12px; border-bottom: 1px solid var(--al-border); border-right: 1px solid var(--al-border-soft);
+    }
+    tbody td {
+      padding: 6px 12px; color: var(--al-slate-700);
+      border-bottom: 1px solid var(--al-border-soft); border-right: 1px solid var(--al-border-soft);
+      max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    tbody tr:hover td { background: var(--al-accent-soft); }
+    tbody th.rownum {
+      position: sticky; left: 0; z-index: 1;
+      background: var(--al-bg-alt); color: var(--al-slate-400);
+      font-weight: 400; text-align: right; padding: 6px 10px;
+      border-bottom: 1px solid var(--al-border-soft); border-right: 1px solid var(--al-border);
+      font-size: 11px;
+    }
+
+    /* ── States ── */
+    .placeholder {
+      flex: 1 1 auto; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px;
+      color: var(--al-slate-400); font-family: var(--al-font-body); font-size: 13px;
+      text-align: center; padding: 24px;
+    }
+    .placeholder svg { opacity: 0.45; }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 14px; padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 50; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .drop-hint {
+      position: absolute; inset: 0; z-index: 5;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(79,70,229,0.06); border: 2px dashed var(--al-accent);
+      border-radius: var(--al-radius-lg);
+      font-family: var(--al-font-body); font-size: 14px; color: var(--al-accent);
+    }
+    .is-dragging .drop-hint { display: flex; }
+
+    .hidden { display: none !important; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>JSON / CSV 檢視轉換器</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+    </div>
+    <p>貼上或拖入 JSON / CSV / TSV，即時格式化、樹狀展開、表格檢視與雙向互轉。所有解析都在你的瀏覽器內完成，資料不會離開這台電腦。</p>
+  </header>
+
+  <div class="toolbar" role="toolbar" aria-label="操作列">
+    <div class="field">
+      <label for="mode">來源格式</label>
+      <select id="mode" aria-label="來源格式">
+        <option value="auto">自動偵測</option>
+        <option value="json">JSON</option>
+        <option value="csv">CSV / TSV</option>
+      </select>
+    </div>
+
+    <div class="field" id="field-delim">
+      <label for="delim">分隔符</label>
+      <select id="delim" aria-label="CSV 分隔符">
+        <option value="auto">自動</option>
+        <option value=",">逗號 ,</option>
+        <option value=";">分號 ;</option>
+        <option value="&#9;">Tab</option>
+        <option value="|">直線 |</option>
+      </select>
+    </div>
+
+    <div class="field" id="field-indent">
+      <label for="indent">縮排</label>
+      <select id="indent" aria-label="JSON 縮排">
+        <option value="2">2 空格</option>
+        <option value="4">4 空格</option>
+        <option value="tab">Tab</option>
+        <option value="0">最小化</option>
+      </select>
+    </div>
+
+    <div class="toolbar__sep" aria-hidden="true"></div>
+
+    <div class="field">
+      <label for="view">輸出檢視</label>
+      <select id="view" aria-label="輸出檢視">
+        <option value="pretty">格式化文字</option>
+        <option value="tree">樹狀檢視</option>
+        <option value="table">表格檢視</option>
+        <option value="csv">轉成 CSV</option>
+        <option value="json">轉成 JSON</option>
+      </select>
+    </div>
+
+    <div class="toolbar__spacer"></div>
+
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-sample" type="button">載入範例</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-file" type="button">開啟檔案</button>
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-clear" type="button">清空</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-copy" type="button">複製結果</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-download" type="button">下載</button>
+    <input type="file" id="file-input" class="visually-hidden"
+           accept=".json,.csv,.tsv,.txt,.ndjson,application/json,text/csv,text/plain" />
+  </div>
+
+  <div class="panes">
+    <section class="pane" aria-label="輸入">
+      <div class="pane__head">
+        <h2 class="pane__title">輸入</h2>
+        <span class="pane__meta" id="in-meta">0 行 · 0 B</span>
+      </div>
+      <div class="pane__body" id="drop-zone">
+        <textarea id="input" spellcheck="false" autocomplete="off"
+                  placeholder="在這裡貼上 JSON 或 CSV，或直接把檔案拖進來&#10;&#10;支援：.json / .ndjson / .csv / .tsv / .txt"></textarea>
+        <div class="drop-hint" aria-hidden="true">放開以載入檔案</div>
+      </div>
+    </section>
+
+    <section class="pane" aria-label="輸出">
+      <div class="pane__head">
+        <h2 class="pane__title" id="out-title">輸出</h2>
+        <span class="pane__meta" id="out-meta"></span>
+      </div>
+      <div class="pane__body" id="out-body">
+        <div class="placeholder" id="placeholder">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2"/>
+            <path d="M16 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2"/>
+          </svg>
+          <span>左側輸入內容後，結果會即時顯示在這裡</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar" id="status" role="status" aria-live="polite">等待輸入。</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     此工具刻意不使用 localStorage / 同源 fetch / 外部 worker，
+     以便在大廳的 sandbox="allow-scripts allow-forms" 預覽視窗
+     （不透明來源 opaque origin）中也能完整運作。
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var elInput    = $('input');
+  var elOutBody  = $('out-body');
+  var elOutTitle = $('out-title');
+  var elOutMeta  = $('out-meta');
+  var elInMeta   = $('in-meta');
+  var elStatus   = $('status');
+  var elToast    = $('toast');
+  var elMode     = $('mode');
+  var elDelim    = $('delim');
+  var elIndent   = $('indent');
+  var elView     = $('view');
+  var elDrop     = $('drop-zone');
+  var elFile     = $('file-input');
+
+  var state = {
+    detected: null,   // 'json' | 'csv' | null
+    data:     null,   // 解析後的結構
+    columns:  null,   // CSV 欄位名
+    text:     '',     // 目前可複製 / 下載的文字輸出
+    error:    null
+  };
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    elToast.textContent = msg;
+    elToast.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { elToast.classList.remove('is-on'); }, 1900);
+  }
+
+  function setStatus(msg, kind) {
+    elStatus.className = 'statusbar' + (kind ? ' is-' + kind : '');
+    elStatus.innerHTML = msg;
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function clearNode(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  /* ── CSV 解析（RFC 4180：引號欄位、跳脫引號、欄位內換行） ── */
+
+  function detectDelimiter(text) {
+    var sample = text.slice(0, 64 * 1024);
+    var cands = [',', ';', '\t', '|'];
+    var best = ',', bestScore = -1;
+
+    for (var i = 0; i < cands.length; i++) {
+      var rows = parseCSV(sample, cands[i], 40);
+      if (rows.length < 1) continue;
+      // 好的分隔符：欄位數 > 1 且各列欄位數一致
+      var width = rows[0].length;
+      if (width < 2) continue;
+      var consistent = 0;
+      for (var r = 0; r < rows.length; r++) if (rows[r].length === width) consistent++;
+      var score = width * (consistent / rows.length);
+      if (score > bestScore) { bestScore = score; best = cands[i]; }
+    }
+    return bestScore > 0 ? best : ',';
+  }
+
+  function parseCSV(text, delim, maxRows) {
+    var rows = [], field = '', row = [], i = 0, inQuotes = false;
+    var n = text.length;
+
+    // 去掉 UTF-8 BOM
+    if (n && text.charCodeAt(0) === 0xFEFF) { i = 1; }
+
+    for (; i < n; i++) {
+      var ch = text[i];
+
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }   // 跳脫的引號
+          else { inQuotes = false; }
+        } else {
+          field += ch;
+        }
+        continue;
+      }
+
+      if (ch === '"') { inQuotes = true; continue; }
+
+      if (ch === delim) { row.push(field); field = ''; continue; }
+
+      if (ch === '\r') { if (text[i + 1] === '\n') i++; ch = '\n'; }
+
+      if (ch === '\n') {
+        row.push(field); field = '';
+        rows.push(row); row = [];
+        if (maxRows && rows.length >= maxRows) return rows;
+        continue;
+      }
+
+      field += ch;
+    }
+
+    // 收尾：忽略檔尾單一空行
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function toCSVField(v, delim) {
+    var s;
+    if (v === null || v === undefined) s = '';
+    else if (typeof v === 'object') s = JSON.stringify(v);
+    else s = String(v);
+    if (s.indexOf(delim) >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  /* ── 巢狀物件扁平化：{a:{b:1}} → {"a.b":1} ─────────────── */
+
+  function flatten(obj, prefix, out) {
+    out = out || {};
+    prefix = prefix || '';
+    if (obj === null || typeof obj !== 'object') { out[prefix || 'value'] = obj; return out; }
+
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) { out[prefix] = '[]'; return out; }
+      for (var i = 0; i < obj.length; i++) flatten(obj[i], prefix ? prefix + '.' + i : String(i), out);
+      return out;
+    }
+
+    var keys = Object.keys(obj);
+    if (keys.length === 0) { out[prefix] = '{}'; return out; }
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      flatten(obj[key], prefix ? prefix + '.' + key : key, out);
+    }
+    return out;
+  }
+
+  /* ── 型別還原：CSV 字串 → number / boolean / null ───────── */
+
+  function coerce(s) {
+    if (s === '') return '';
+    if (s === 'null') return null;
+    if (s === 'true') return true;
+    if (s === 'false') return false;
+    // 僅還原標準十進位數字，避免破壞郵遞區號 / 前導零 / 電話號碼
+    if (/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(s)) {
+      var n = Number(s);
+      if (String(n) === s) return n;
+    }
+    return s;
+  }
+
+  /* ── 輸入解析 ───────────────────────────────────────────── */
+
+  function looksLikeJSON(text) {
+    var t = text.trim();
+    if (!t) return false;
+    var c = t[0];
+    return c === '{' || c === '[' || c === '"' ||
+           /^(true|false|null|-?\d)/.test(t);
+  }
+
+  function jsonErrorDetail(text, err) {
+    var msg = err && err.message ? err.message : String(err);
+    var line = null, col = null, pos = null;
+
+    // V8 訊息有兩種形態：「at position 16」與「(line 2 column 8)」，新版短字串則兩者皆無
+    var mLine = /line\s+(\d+)\s+column\s+(\d+)/i.exec(msg);
+    var mPos  = /position\s+(\d+)/i.exec(msg);
+
+    if (mLine) {
+      line = Number(mLine[1]);
+      col  = Number(mLine[2]);
+      var lines = text.split('\n');
+      pos = 0;
+      for (var i = 0; i < line - 1 && i < lines.length; i++) pos += lines[i].length + 1;
+      pos += col - 1;
+    } else if (mPos) {
+      pos = Number(mPos[1]);
+      var before = text.slice(0, pos);
+      line = before.split('\n').length;
+      col = pos - before.lastIndexOf('\n');
+    } else {
+      // 訊息未帶位置：自行掃出第一個明顯的結構性問題點（尾隨逗號 / 空值）
+      var mBad = /,\s*[}\]]|:\s*[,}\]]/.exec(text);
+      if (!mBad) return esc(msg);
+      pos = mBad.index + 1;
+      var b2 = text.slice(0, pos);
+      line = b2.split('\n').length;
+      col = pos - b2.lastIndexOf('\n');
+    }
+
+    // 只保留原訊息第一句，避免 V8 把整段輸入回貼進來洗掉版面
+    var head = msg.replace(/,\s*(?:\.\.\.)?"[\s\S]*$/, '').replace(/\s+is not valid JSON[\s\S]*$/, '');
+    var near = text.slice(Math.max(0, pos - 24), pos + 24).replace(/\n/g, '↵');
+    return esc(head) + ' — 第 <code>' + line + '</code> 行第 <code>' + col +
+           '</code> 欄附近：<code>' + esc(near) + '</code>';
+  }
+
+  function parseInput(text) {
+    state.detected = null;
+    state.data = null;
+    state.columns = null;
+    state.error = null;
+
+    if (!text.trim()) return;
+
+    var mode = elMode.value;
+    var wantJSON = mode === 'json' || (mode === 'auto' && looksLikeJSON(text));
+
+    if (wantJSON) {
+      state.detected = 'json';
+      try {
+        state.data = JSON.parse(text);
+      } catch (e) {
+        // 退路：NDJSON（每行一筆 JSON）
+        var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+        if (lines.length > 1) {
+          try {
+            var arr = lines.map(function (l) { return JSON.parse(l); });
+            state.data = arr;
+            state.detected = 'ndjson';
+            return;
+          } catch (e2) { /* 落回原始錯誤 */ }
+        }
+        state.error = 'JSON 解析失敗：' + jsonErrorDetail(text, e);
+      }
+      return;
+    }
+
+    // CSV / TSV
+    state.detected = 'csv';
+    var delim = elDelim.value === 'auto' ? detectDelimiter(text) : elDelim.value;
+    state.delim = delim;
+
+    var rows = parseCSV(text, delim);
+    if (!rows.length) { state.error = 'CSV 解析後沒有任何資料列。'; return; }
+
+    var header = rows[0].map(function (h, i) { return h.trim() || ('欄位' + (i + 1)); });
+    var seen = {};
+    header = header.map(function (h) {           // 欄名去重
+      if (seen[h] === undefined) { seen[h] = 0; return h; }
+      seen[h]++; return h + '_' + seen[h];
+    });
+
+    var records = [];
+    var ragged = 0;
+    for (var r = 1; r < rows.length; r++) {
+      if (rows[r].length !== header.length) ragged++;
+      var obj = {};
+      for (var c = 0; c < header.length; c++) obj[header[c]] = coerce(rows[r][c] !== undefined ? rows[r][c] : '');
+      records.push(obj);
+    }
+
+    state.columns = header;
+    state.data = records;
+    state.ragged = ragged;
+  }
+
+  /* ── 輸出渲染 ───────────────────────────────────────────── */
+
+  function indentValue() {
+    var v = elIndent.value;
+    if (v === 'tab') return '\t';
+    if (v === '0') return '';
+    return Number(v);
+  }
+
+  function renderPretty() {
+    var txt = JSON.stringify(state.data, null, indentValue());
+    if (txt === undefined) txt = String(state.data);
+    state.text = txt;
+    var pre = document.createElement('pre');
+    pre.className = 'output';
+    pre.textContent = txt;
+    elOutBody.appendChild(pre);
+    elOutTitle.textContent = '輸出 · 格式化 JSON';
+  }
+
+  function valueSpan(v) {
+    var span = document.createElement('span');
+    if (v === null) { span.className = 'tw-null'; span.textContent = 'null'; }
+    else if (typeof v === 'string') { span.className = 'tw-str'; span.textContent = '"' + v + '"'; }
+    else if (typeof v === 'number') { span.className = 'tw-num'; span.textContent = String(v); }
+    else if (typeof v === 'boolean') { span.className = 'tw-bool'; span.textContent = String(v); }
+    else { span.className = 'tw-null'; span.textContent = String(v); }
+    return span;
+  }
+
+  function buildTree(value, keyLabel, path, isIndex, depth) {
+    var li = document.createElement('li');
+    var isObj = value !== null && typeof value === 'object';
+
+    if (isObj) {
+      var entries = Array.isArray(value)
+        ? value.map(function (v, i) { return [String(i), v, true]; })
+        : Object.keys(value).map(function (k) { return [k, value[k], false]; });
+
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'tw-toggle';
+      toggle.textContent = '−';
+      toggle.setAttribute('aria-label', '展開或收合');
+      li.appendChild(toggle);
+
+      if (keyLabel !== null) {
+        var k = document.createElement('span');
+        k.className = isIndex ? 'tw-idx' : 'tw-key';
+        k.textContent = isIndex ? '[' + keyLabel + ']' : keyLabel;
+        k.title = '點擊複製路徑：' + path;
+        k.addEventListener('click', function () { copyText(path, '已複製路徑 ' + path); });
+        li.appendChild(k);
+        var colon = document.createElement('span');
+        colon.className = 'tw-colon';
+        colon.textContent = ':';
+        li.appendChild(colon);
+      }
+
+      var brace = document.createElement('span');
+      brace.className = 'tw-colon';
+      brace.textContent = Array.isArray(value) ? '[' : '{';
+      li.appendChild(brace);
+
+      var count = document.createElement('span');
+      count.className = 'tw-count';
+      count.textContent = entries.length + (Array.isArray(value) ? ' 項' : ' 鍵');
+      li.appendChild(count);
+
+      var ul = document.createElement('ul');
+      for (var i = 0; i < entries.length; i++) {
+        var childPath = entries[i][2]
+          ? path + '[' + entries[i][0] + ']'
+          : (path ? path + '.' + entries[i][0] : entries[i][0]);
+        ul.appendChild(buildTree(entries[i][1], entries[i][0], childPath, entries[i][2], depth + 1));
+      }
+      li.appendChild(ul);
+
+      // 預設把第 3 層以下收合，避免大檔一次撐開
+      if (depth >= 2 && entries.length) {
+        li.classList.add('tw-collapsed');
+        toggle.textContent = '+';
+      }
+
+      toggle.addEventListener('click', function () {
+        var collapsed = li.classList.toggle('tw-collapsed');
+        toggle.textContent = collapsed ? '+' : '−';
+      });
+
+    } else {
+      li.appendChild(Object.assign(document.createElement('span'), { className: 'tw-spacer' }));
+      if (keyLabel !== null) {
+        var k2 = document.createElement('span');
+        k2.className = isIndex ? 'tw-idx' : 'tw-key';
+        k2.textContent = isIndex ? '[' + keyLabel + ']' : keyLabel;
+        k2.title = '點擊複製路徑：' + path;
+        k2.addEventListener('click', function () { copyText(path, '已複製路徑 ' + path); });
+        li.appendChild(k2);
+        var c2 = document.createElement('span');
+        c2.className = 'tw-colon';
+        c2.textContent = ':';
+        li.appendChild(c2);
+      }
+      li.appendChild(valueSpan(value));
+    }
+
+    return li;
+  }
+
+  function renderTree() {
+    state.text = JSON.stringify(state.data, null, indentValue());
+    var wrap = document.createElement('div');
+    wrap.className = 'output tree';
+    var ul = document.createElement('ul');
+    ul.appendChild(buildTree(state.data, null, '$', false, 0));
+    wrap.appendChild(ul);
+    elOutBody.appendChild(wrap);
+    elOutTitle.textContent = '輸出 · 樹狀檢視';
+  }
+
+  function asRecordArray() {
+    // 表格 / CSV 需要「物件陣列」；其他形狀盡量轉成可讀的表
+    var d = state.data;
+    if (Array.isArray(d)) {
+      if (!d.length) return { rows: [], cols: [] };
+      var allObj = d.every(function (x) { return x !== null && typeof x === 'object' && !Array.isArray(x); });
+      if (allObj) {
+        var flat = d.map(function (x) { return flatten(x); });
+        var cols = [], seen = {};
+        flat.forEach(function (o) {
+          Object.keys(o).forEach(function (k) { if (!seen[k]) { seen[k] = 1; cols.push(k); } });
+        });
+        return { rows: flat, cols: cols };
+      }
+      // 純量陣列 / 混合陣列 → 單欄
+      return { rows: d.map(function (v) { return { value: (v !== null && typeof v === 'object') ? JSON.stringify(v) : v }; }), cols: ['value'] };
+    }
+    if (d !== null && typeof d === 'object') {
+      var f = flatten(d);
+      return { rows: [f], cols: Object.keys(f) };
+    }
+    return { rows: [{ value: d }], cols: ['value'] };
+  }
+
+  function renderTable() {
+    var t = asRecordArray();
+    if (!t.rows.length) {
+      showPlaceholder('資料是空的，沒有可以顯示的列。');
+      state.text = '';
+      return;
+    }
+
+    var MAX = 1000;
+    var shown = Math.min(t.rows.length, MAX);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'tablewrap';
+    var table = document.createElement('table');
+
+    var thead = document.createElement('thead');
+    var trh = document.createElement('tr');
+    trh.appendChild(Object.assign(document.createElement('th'), { textContent: '#' }));
+    t.cols.forEach(function (c) {
+      trh.appendChild(Object.assign(document.createElement('th'), { textContent: c }));
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (var i = 0; i < shown; i++) {
+      var tr = document.createElement('tr');
+      var th = document.createElement('th');
+      th.className = 'rownum';
+      th.textContent = String(i + 1);
+      tr.appendChild(th);
+      for (var c = 0; c < t.cols.length; c++) {
+        var v = t.rows[i][t.cols[c]];
+        var td = document.createElement('td');
+        td.textContent = (v === undefined || v === null) ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        td.title = td.textContent;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    elOutBody.appendChild(wrap);
+
+    elOutTitle.textContent = '輸出 · 表格檢視';
+    elOutMeta.textContent = t.rows.length + ' 列 × ' + t.cols.length + ' 欄' +
+                            (t.rows.length > MAX ? '（僅顯示前 ' + MAX + ' 列）' : '');
+    state.text = buildCSV(t, ',');
+  }
+
+  function buildCSV(t, delim) {
+    var out = [t.cols.map(function (c) { return toCSVField(c, delim); }).join(delim)];
+    for (var i = 0; i < t.rows.length; i++) {
+      var line = [];
+      for (var c = 0; c < t.cols.length; c++) line.push(toCSVField(t.rows[i][t.cols[c]], delim));
+      out.push(line.join(delim));
+    }
+    return out.join('\r\n');
+  }
+
+  function renderCSVOut() {
+    var t = asRecordArray();
+    var delim = (elDelim.value === 'auto') ? ',' : elDelim.value;
+    state.text = buildCSV(t, delim);
+    var pre = document.createElement('pre');
+    pre.className = 'output';
+    pre.textContent = state.text;
+    elOutBody.appendChild(pre);
+    elOutTitle.textContent = '輸出 · CSV';
+    elOutMeta.textContent = t.rows.length + ' 列 × ' + t.cols.length + ' 欄';
+  }
+
+  function renderJSONOut() {
+    state.text = JSON.stringify(state.data, null, indentValue());
+    var pre = document.createElement('pre');
+    pre.className = 'output';
+    pre.textContent = state.text;
+    elOutBody.appendChild(pre);
+    elOutTitle.textContent = '輸出 · JSON';
+  }
+
+  function showPlaceholder(msg) {
+    var d = document.createElement('div');
+    d.className = 'placeholder';
+    d.textContent = msg;
+    elOutBody.appendChild(d);
+  }
+
+  /* ── 主流程 ─────────────────────────────────────────────── */
+
+  var renderTimer = null;
+  function scheduleRender() {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(render, 160);
+  }
+
+  function render() {
+    var text = elInput.value;
+
+    // 輸入統計
+    var bytes = new Blob([text]).size;
+    var lines = text ? text.split(/\r?\n/).length : 0;
+    elInMeta.textContent = lines + ' 行 · ' + fmtBytes(bytes);
+
+    clearNode(elOutBody);
+    elOutMeta.textContent = '';
+    elOutTitle.textContent = '輸出';
+    state.text = '';
+
+    if (!text.trim()) {
+      showPlaceholder('左側輸入內容後，結果會即時顯示在這裡');
+      setStatus('等待輸入。');
+      return;
+    }
+
+    var t0 = (performance && performance.now) ? performance.now() : Date.now();
+
+    try {
+      parseInput(text);
+    } catch (e) {
+      state.error = '解析時發生非預期錯誤：' + esc(e && e.message ? e.message : String(e));
+    }
+
+    if (state.error) {
+      showPlaceholder('無法解析，請看下方訊息。');
+      setStatus(state.error, 'error');
+      return;
+    }
+
+    var view = elView.value;
+    try {
+      if (view === 'tree')       renderTree();
+      else if (view === 'table') renderTable();
+      else if (view === 'csv')   renderCSVOut();
+      else if (view === 'json')  renderJSONOut();
+      else                       renderPretty();
+    } catch (e) {
+      clearNode(elOutBody);
+      showPlaceholder('產生輸出時發生錯誤。');
+      setStatus('產生輸出時發生錯誤：' + esc(e && e.message ? e.message : String(e)), 'error');
+      return;
+    }
+
+    var t1 = (performance && performance.now) ? performance.now() : Date.now();
+
+    var kindLabel = state.detected === 'ndjson' ? 'NDJSON（每行一筆）'
+                  : state.detected === 'json'   ? 'JSON'
+                  : 'CSV / TSV';
+    var parts = ['已辨識為 <code>' + kindLabel + '</code>'];
+
+    if (state.detected === 'csv') {
+      var dn = { ',': '逗號', ';': '分號', '\t': 'Tab', '|': '直線' }[state.delim] || state.delim;
+      parts.push('分隔符 <code>' + dn + '</code>');
+      parts.push(state.data.length + ' 筆 × ' + state.columns.length + ' 欄');
+    }
+    parts.push('耗時 <code>' + Math.max(1, Math.round(t1 - t0)) + ' ms</code>');
+
+    if (state.detected === 'csv' && state.ragged) {
+      setStatus(parts.join(' · ') + ' — 有 <code>' + state.ragged + '</code> 列的欄位數與標題列不符，缺少的欄位以空字串補上。', 'warn');
+    } else {
+      setStatus(parts.join(' · '), 'ok');
+    }
+
+    if (!elOutMeta.textContent && state.text) {
+      elOutMeta.textContent = fmtBytes(new Blob([state.text]).size);
+    }
+  }
+
+  /* ── 複製 / 下載 ────────────────────────────────────────── */
+
+  function copyText(text, okMsg) {
+    if (!text) { toast('沒有可複製的內容'); return; }
+
+    function fallback() {
+      // sandbox 沙箱（不透明來源）下 navigator.clipboard 常被擋，改走 execCommand
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      toast(ok ? (okMsg || '已複製') : '此環境不允許自動複製，請手動選取輸出區複製');
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { toast(okMsg || '已複製'); },
+        fallback
+      );
+    } else {
+      fallback();
+    }
+  }
+
+  function download() {
+    if (!state.text) { toast('沒有可下載的內容'); return; }
+    var view = elView.value;
+    var isCSV = (view === 'csv') || (view === 'table');
+    var ext = isCSV ? 'csv' : 'json';
+    var mime = isCSV ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8';
+    // CSV 加上 BOM，Excel 開啟中文才不會亂碼
+    var payload = isCSV ? ['﻿', state.text] : [state.text];
+
+    var blob = new Blob(payload, { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'converted-' + new Date().toISOString().slice(0, 10) + '.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('已開始下載 ' + a.download);
+  }
+
+  /* ── 檔案讀取 ───────────────────────────────────────────── */
+
+  function loadFile(file) {
+    if (!file) return;
+    var MAX = 20 * 1024 * 1024;
+    if (file.size > MAX) {
+      setStatus('檔案 <code>' + esc(file.name) + '</code> 為 ' + fmtBytes(file.size) +
+                '，超過 20 MB 上限。請先切分後再載入。', 'error');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () {
+      setStatus('讀取檔案 <code>' + esc(file.name) + '</code> 失敗。', 'error');
+    };
+    reader.onload = function () {
+      elInput.value = String(reader.result || '');
+      var name = file.name.toLowerCase();
+      if (/\.(csv|tsv)$/.test(name)) elMode.value = 'csv';
+      else if (/\.(json|ndjson)$/.test(name)) elMode.value = 'json';
+      if (/\.tsv$/.test(name)) elDelim.value = '\t';
+      syncFields();
+      render();
+      toast('已載入 ' + file.name);
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  /* ── 欄位連動 ───────────────────────────────────────────── */
+
+  function syncFields() {
+    var view = elView.value;
+    var csvish = (elMode.value === 'csv') || view === 'csv' || view === 'table';
+    $('field-delim').style.opacity = csvish ? '1' : '0.45';
+    $('field-indent').style.opacity = (view === 'csv' || view === 'table') ? '0.45' : '1';
+  }
+
+  /* ── 事件 ───────────────────────────────────────────────── */
+
+  elInput.addEventListener('input', scheduleRender);
+  [elMode, elDelim, elIndent, elView].forEach(function (el) {
+    el.addEventListener('change', function () { syncFields(); render(); });
+  });
+
+  $('btn-copy').addEventListener('click', function () { copyText(state.text, '已複製結果'); });
+  $('btn-download').addEventListener('click', download);
+  $('btn-clear').addEventListener('click', function () {
+    elInput.value = '';
+    render();
+    elInput.focus();
+  });
+  $('btn-file').addEventListener('click', function () { elFile.click(); });
+  elFile.addEventListener('change', function () {
+    loadFile(elFile.files && elFile.files[0]);
+    elFile.value = '';
+  });
+
+  $('btn-sample').addEventListener('click', function () {
+    elInput.value = JSON.stringify([
+      { id: 1, name: '林小雨', email: 'rain@example.com', active: true,
+        profile: { city: '台北', tags: ['設計', '前端'] }, score: 92.5 },
+      { id: 2, name: 'Chen, Wei', email: 'wei@example.com', active: false,
+        profile: { city: '高雄', tags: ['後端'] }, score: 78 },
+      { id: 3, name: '含"引號"的名字', email: 'quote@example.com', active: true,
+        profile: { city: '台中', tags: [] }, score: null }
+    ], null, 2);
+    elMode.value = 'auto';
+    elView.value = 'tree';
+    syncFields();
+    render();
+    toast('已載入範例，切換右上「輸出檢視」看不同呈現');
+  });
+
+  // 拖放
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    elDrop.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      elDrop.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    elDrop.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ev === 'dragleave' && elDrop.contains(e.relatedTarget)) return;
+      elDrop.classList.remove('is-dragging');
+    });
+  });
+  elDrop.addEventListener('drop', function (e) {
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
+  });
+
+  // 全域錯誤：不讓工具默默白畫面
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  syncFields();
+  render();
+})();
+</script>
+</body>
+</html>

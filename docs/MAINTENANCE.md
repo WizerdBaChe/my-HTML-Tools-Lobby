@@ -33,6 +33,22 @@ tools/<tool-id>/index.html
 
 工具相關資源應優先放在自己的資料夾，不要濫用全域共用資源。
 
+#### 第三方函式庫一律隨工具存放
+
+工具需要的第三方函式庫，必須把檔案實體放進：
+
+```text
+tools/<tool-id>/libs/
+```
+
+不要從 CDN 載入。理由：CDN 不可達、被牆、或套件被下架時，工具會直接壞掉，
+而靜態站沒有後端可以補救；vendored 版本則是離線可用、版本鎖死、行為可重現。
+
+vendored 進來的函式庫要一併保留其 `LICENSE`，並在工具頁的註解裡記下版本號與來源網址。
+
+> 現況例外：`Html-live` 與 `text_DiffLens` 仍走 jsDelivr，屬於此原則確立前的既有寫法。
+> 它們不是範本，日後若要調整再一併處理。
+
 ### 2. Lobby 與工具分離
 
 `index.html` 的角色是大廳頁，不應承載具體工具邏輯。
@@ -138,6 +154,17 @@ Lobby 只負責：
 - `data`
 - `image`
 - `experimental`
+- `entertainment`
+
+#### 分類不變條件
+
+`assets/js/lobby.js` 中的 `CATEGORY_ICONS`、`CATEGORY_SVG`、`CATEGORY_LABELS` 三張表，
+必須涵蓋 `tools.json` 裡出現過的每一個 `category` 值。
+
+漏掉任何一張表都不會報錯，只會靜默降級：卡片顯示預設齒輪圖示、篩選按鈕沒有圖示、
+標籤直接印出英文原字。新增分類時三張表要一起改。
+
+> 檢查方式：把 `tools.json` 的 `category` 取集合，逐一確認三張表都有對應的鍵。
 
 ### 日期格式
 
@@ -207,6 +234,20 @@ YYYY-MM-DD
 
 不適合內嵌時，應將 `supportsIframe` 設為 `false`。
 外部工具（`path` 為完整 URL）因跨 origin 限制，通常無法 iframe 內嵌，應一律設為 `false`。
+
+### 預覽沙箱的硬限制
+
+首頁的預覽 iframe 使用 `sandbox="allow-scripts allow-forms"`，**刻意不含 `allow-same-origin`**
+（見 v1.1.0 更新紀錄）。工具在預覽視窗中因此執行於不透明來源 (opaque origin)，以下能力不可用或不可靠：
+
+- `localStorage` / `sessionStorage` / IndexedDB — 存取會拋出 `SecurityError`
+- `navigator.clipboard.writeText` — 常被權限政策擋下，必須準備 `document.execCommand('copy')` 退路
+- `new Worker('./worker.js')` — 外部檔案的 worker 會被擋，需改用 blob URL 建立
+- 相機 / 麥克風 — 預覽 iframe 沒有 `allow="camera"`，取用一定失敗
+
+`supportsIframe` 的判準：**工具的核心功能在上述限制下仍然完整可用**才設 `true`。
+若核心功能依賴 ES module 動態載入（`import()`）等尚未在真實沙箱中驗證過的能力，
+先設 `false`，等在正式站上確認可用再改回 `true` — 一個只會顯示錯誤訊息的預覽，比沒有預覽按鈕更糟。
 ## 更新原則
 
 ### 小更新

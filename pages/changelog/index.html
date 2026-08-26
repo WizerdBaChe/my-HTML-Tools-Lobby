@@ -76,6 +76,40 @@
       <div class="changelog-timeline">
 
         <article class="changelog-entry">
+          <time class="changelog-entry__date" datetime="2026-08-26">2026-08-26</time>
+          <h3 class="changelog-entry__title">
+            四個新工具上線、補齊娛樂分類
+            <span class="changelog-entry__version">v1.2.0</span>
+          </h3>
+          <div class="changelog-items">
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--new">NEW</span>
+              <span>圖片壓縮／格式轉換器：批次壓縮與 JPEG / WebP / PNG 互轉，可選 MozJPEG 高壓縮模式（與原生編碼同時執行，取較小者）。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--new">NEW</span>
+              <span>JSON / CSV 檢視轉換器：樹狀展開、表格檢視與雙向互轉，首次填入 <code style="font-family:var(--font-mono);font-size:.875em">data</code> 分類。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--new">NEW</span>
+              <span>圖片視覺比對 DiffLens：滑桿對照、洋蔥皮疊合、差異熱圖與閃爍切換。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--new">NEW</span>
+              <span>SVG 優化器：內建 SVGO 4.1.0，可逐一開關 53 個外掛並即時對照渲染結果。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--fix">FIX</span>
+              <span>補上 <code style="font-family:var(--font-mono);font-size:.875em">entertainment</code> 分類的圖示與中文標籤，先前「帶限制爬梯子」的分類按鈕顯示為英文原字加預設齒輪圖示。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--add">ADD</span>
+              <span>確立第三方函式庫一律隨工具 vendored 進 <code style="font-family:var(--font-mono);font-size:.875em">tools/&lt;id&gt;/libs/</code> 的原則，不依賴 CDN。</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="changelog-entry">
           <time class="changelog-entry__date" datetime="2026-06-13">2026-06-13</time>
           <h3 class="changelog-entry__title">
             修復跳轉 Bug、IG Image Filler 上線

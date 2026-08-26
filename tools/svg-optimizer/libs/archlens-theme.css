@@ -1,0 +1,406 @@
+/**
+ * archlens-theme.css
+ * 來源：DefaultTheme.tsx（ArchLens 專案的 React 主題）設計語言抽出版
+ *
+ * 這不是「裝上去整站就變這個樣子」的即插即用主題包。
+ * 原檔案的版面結構（左右 hero、雙欄工作區、macOS 視窗卡片）與互動邏輯
+ * 是綁在 React 元件與特定 DOM 結構上的，換框架/換 HTML 結構後選擇器對不到元素。
+ *
+ * 這份檔案抽出的是「設計語言」本身：配色、字體、陰影、圓角、間距邏輯、
+ * 動畫關鍵幀，全部轉成 CSS 變數 + 一組可重複使用的 utility class。
+ * 用法：在任何 JS-Based 專案的 HTML 中引入這個檔案，按需要把對應 class
+ * 貼到你自己的元素上即可重現相同視覺風格，不需要相同的元件結構。
+ */
+
+/* ============================================================
+   1. 字體（Google Fonts import）
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600;700;900&display=swap');
+
+/* ============================================================
+   2. 設計 Token（CSS 變數）
+   ============================================================ */
+:root {
+  /* ── 色彩 Palette ──────────────────────────────────────── */
+  --al-bg:            #F5F4F0; /* 暖米底，主背景 */
+  --al-bg-alt:        #F0EFE9; /* 次背景，用於右欄/留白區塊區隔 */
+  --al-border:        #E5E3DC; /* 主分隔線 */
+  --al-border-soft:   #F0EFE9; /* 較淡的分隔線 */
+  --al-ink:           #1A1A1A; /* 主文字（接近黑，非純黑） */
+  --al-slate-700:     #374151; /* 次要強調文字（如 ASCII 內容） */
+  --al-slate-500:     #6B7280; /* 說明文字 */
+  --al-slate-400:     #94A3B8; /* 輔助/淡化文字 */
+  --al-white:         #FFFFFF;
+
+  --al-accent:        #4F46E5; /* indigo，唯一行動色（CTA / 連結 / 強調） */
+  --al-accent-hover:  #4338CA;
+  --al-accent-active: #3730A3;
+  --al-accent-soft:   #EEF2FF; /* indigo-50，淡色底（badge / hover 背景） */
+  --al-accent-border: #E0E7FF; /* indigo-100，淡色邊框 */
+
+  --al-warn-bg:       #FFFBEB; /* amber-50 */
+  --al-warn-border:   #FDE68A; /* amber-200 */
+  --al-warn-text:     #B45309; /* amber-700 */
+
+  --al-error-bg:      #FEF2F2; /* red-50 */
+  --al-error-border:  #FECACA; /* red-200 */
+  --al-error-text:    #DC2626; /* red-500/600 */
+
+  --al-success:       #28C840; /* macOS 綠燈，亦可作成功色 */
+  --al-success-bg:    #DCFCE7; /* al-badge--live 背景，與 imagetool 主題對齊 */
+
+  /* macOS 視窗紅黃綠燈，僅作裝飾用，非語意色 */
+  --al-dot-red:        #FF5F57;
+  --al-dot-yellow:     #FEBC2E;
+  --al-dot-green:      #28C840;
+
+  /* Hacker / Dev 模式切換按鈕用色（深色底配霓虹綠） */
+  --al-hacker-bg:      #0F172A; /* slate-900 */
+  --al-hacker-bg-hover:#1E293B; /* slate-800 */
+  --al-hacker-text:    #34D399; /* emerald-400 */
+
+  /* ── 字體 Type ────────────────────────────────────────── */
+  --al-font-display: 'Syne', sans-serif;   /* Hero 大標、品牌字 */
+  --al-font-body:     'Inter', sans-serif; /* 內文 / UI 文字 */
+  --al-font-mono:     ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; /* ASCII / 終端機文字 */
+
+  /* ── 圓角 Radius（圓潤但不過度，卡片用大圓角，按鈕/badge 用中圓角） */
+  --al-radius-sm:  8px;   /* 小型互動元素，如 toggle 內部圓點 */
+  --al-radius-md:  12px;  /* 一般按鈕、小卡片、badge 外框 */
+  --al-radius-lg:  16px;  /* 主要 CTA 按鈕、功能卡片 */
+  --al-radius-xl:  24px;  /* hero 區重要卡片（如終端機視窗外框） */
+  --al-radius-full: 9999px; /* badge、toggle 開關、圓形按鈕 */
+
+  /* ── 陰影 Shadow（柔和、低對比，避免厚重感） ───────────── */
+  --al-shadow-card:   0 1px 2px rgba(0,0,0,0.04);
+  --al-shadow-cta:    0 10px 24px rgba(79,70,229,0.18); /* indigo 陰影，僅給主行動按鈕 */
+  --al-shadow-float:  0 24px 60px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.06); /* 浮動卡片，如終端機視窗 */
+
+  /* ── 間距節奏（用於 hero 與卡片排版的基準值） ───────────── */
+  --al-space-section: 80px; /* hero 區上下留白 */
+  --al-space-card:    20px; /* 卡片內距 */
+  --al-grid-size:     32px; /* 背景格線單位 */
+}
+
+/* ============================================================
+   3. 基礎排版
+   ============================================================ */
+.al-root {
+  background: var(--al-bg);
+  color: var(--al-ink);
+  font-family: var(--al-font-body);
+}
+
+.al-display {
+  font-family: var(--al-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+}
+
+.al-mono {
+  font-family: var(--al-font-mono);
+}
+
+/* ============================================================
+   4. 稿紙格線背景（Signature 視覺元素之一）
+   用法：父層需設定 position: relative，再疊一層 .al-grid-bg
+   ============================================================ */
+.al-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image:
+    linear-gradient(var(--al-ink) 1px, transparent 1px),
+    linear-gradient(90deg, var(--al-ink) 1px, transparent 1px);
+  background-size: var(--al-grid-size) var(--al-grid-size);
+}
+
+/* ============================================================
+   5. Badge / Pill（標籤、狀態指示）
+   ============================================================ */
+.al-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--al-radius-full);
+  border: 1px solid var(--al-accent-border);
+  background: var(--al-accent-soft);
+  color: var(--al-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.al-badge--live {
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--al-success);
+  background: var(--al-success-bg);
+  border-color: transparent;
+}
+
+/* ============================================================
+   6. 按鈕
+   ============================================================ */
+.al-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 28px;
+  border-radius: var(--al-radius-lg);
+  font-weight: 600;
+  font-size: 15px;
+  transition: background-color .15s ease, opacity .15s ease;
+  cursor: pointer;
+  border: none;
+}
+.al-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 主行動按鈕：唯一使用 accent 色，整站只該有一個視覺重心 */
+.al-btn--primary {
+  background: var(--al-accent);
+  color: var(--al-white);
+  box-shadow: var(--al-shadow-cta);
+}
+.al-btn--primary:hover  { background: var(--al-accent-hover); }
+.al-btn--primary:active { background: var(--al-accent-active); }
+
+/* 次要按鈕：白底 + 細邊框，低對比但仍可點擊 */
+.al-btn--secondary {
+  background: var(--al-white);
+  color: var(--al-ink);
+  border: 1px solid var(--al-border);
+}
+.al-btn--secondary:hover { background: var(--al-bg-alt); }
+
+/* 小型工具列按鈕（用於次要工具列，比 CTA 更輕量） */
+.al-btn--toolbar {
+  padding: 6px 12px;
+  border-radius: var(--al-radius-md);
+  font-size: 12px;
+  font-weight: 600;
+}
+.al-btn--toolbar.al-btn--secondary { color: var(--al-slate-500); }
+
+/* Hacker / Dev 模式切換鈕：深底霓虹字，刻意突顯與整體基調不同 */
+.al-btn--hacker {
+  background: var(--al-hacker-bg);
+  color: var(--al-hacker-text);
+  font-family: var(--al-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--al-radius-md);
+}
+.al-btn--hacker:hover { background: var(--al-hacker-bg-hover); }
+
+/* ============================================================
+   7. 卡片
+   ============================================================ */
+.al-card {
+  background: var(--al-white);
+  border: 1px solid var(--al-border);
+  border-radius: var(--al-radius-lg);
+  padding: var(--al-space-card);
+}
+
+.al-card--float {
+  border-radius: var(--al-radius-xl);
+  box-shadow: var(--al-shadow-float);
+  border: none;
+}
+
+/* Feature card 內的標籤排版（小標 + 粗體標題 + 說明文字） */
+.al-card-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--al-slate-400);
+  font-weight: 600;
+}
+.al-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.al-card-desc {
+  font-size: 13px;
+  color: var(--al-slate-500);
+  margin-top: 6px;
+}
+
+/* ============================================================
+   8. macOS 風格視窗（浮動終端機卡片標題列）
+   ============================================================ */
+.al-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #F1F5F9;
+}
+.al-window-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.al-window-dot--red    { background: var(--al-dot-red); }
+.al-window-dot--yellow { background: var(--al-dot-yellow); }
+.al-window-dot--green  { background: var(--al-dot-green); }
+.al-window-filename {
+  margin-left: 12px;
+  font-family: var(--al-font-mono);
+  font-size: 11px;
+  color: var(--al-slate-400);
+}
+.al-window-hint {
+  margin-left: auto;
+  font-family: var(--al-font-mono);
+  font-size: 10px;
+  color: #CBD5E1;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================================
+   9. 開關 Toggle
+   ============================================================ */
+.al-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--al-radius-full);
+  background: #CBD5E1; /* off 狀態 */
+  border: none;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.al-toggle[data-on="true"] {
+  background: var(--al-accent);
+}
+.al-toggle-knob {
+  position: absolute;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--al-white);
+  box-shadow: var(--al-shadow-card);
+  transition: transform .15s ease;
+}
+.al-toggle[data-on="true"] .al-toggle-knob {
+  transform: translateX(16px);
+}
+
+/* ============================================================
+   10. 分段切換器（Segmented control，如 BASIC / FULL 模式）
+   ============================================================ */
+.al-segmented {
+  display: inline-flex;
+  padding: 2px;
+  background: #F1F5F9; /* slate-100 */
+  border-radius: var(--al-radius-md);
+}
+.al-segmented-item {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--al-slate-500);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.al-segmented-item[data-active="true"] {
+  background: var(--al-white);
+  color: var(--al-accent);
+  box-shadow: var(--al-shadow-card);
+}
+
+/* ============================================================
+   11. 狀態提示（警告 / 錯誤 / 載入）
+   ============================================================ */
+.al-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--al-radius-lg);
+  font-size: 14px;
+}
+.al-alert--warn {
+  background: var(--al-warn-bg);
+  border: 1px solid var(--al-warn-border);
+  color: var(--al-warn-text);
+}
+.al-alert--error {
+  background: var(--al-error-bg);
+  border: 1px solid var(--al-error-border);
+  color: var(--al-error-text);
+}
+
+.al-spinner {
+  display: inline-block;
+  animation: al-spin 1s linear infinite;
+}
+
+/* ============================================================
+   12. 動畫關鍵幀（Signature 動態）
+   ============================================================ */
+
+/* 打字機游標閃爍：用於 ASCII 展示區塊結尾的假游標 */
+@keyframes al-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+.al-typewriter-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  margin-left: 1px;
+  vertical-align: middle;
+  background: var(--al-accent);
+  animation: al-cursor-blink 0.9s step-end infinite;
+}
+
+/* 載入旋轉圈 */
+@keyframes al-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* 尊重使用者「減少動態」設定 */
+@media (prefers-reduced-motion: reduce) {
+  .al-typewriter-cursor,
+  .al-spinner {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   13. 拖放高亮狀態（drag-over 提示框）
+   ============================================================ */
+.al-dropzone-active {
+  outline: 4px solid var(--al-accent-border);
+  outline-offset: -4px;
+}
+.al-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(238,242,255,0.8); /* accent-soft 半透明 */
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}

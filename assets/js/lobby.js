@@ -20,6 +20,7 @@ const CATEGORY_ICONS = {
   data:         '📊',
   image:        '🖼️',
   experimental: '🧪',
+  entertainment:'🎲',
   default:      '⚙️',
 };
 
@@ -32,6 +33,7 @@ const CATEGORY_SVG = {
   data:         `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="14" x2="8" y2="6"/><line x1="3" y1="14" x2="3" y2="10"/><line x1="13" y1="14" x2="13" y2="2"/></svg>`,
   utility:      `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v2m0 10v2M1 8h2m10 0h2m-3.05-4.95-1.41 1.41M4.46 11.54l-1.41 1.41m0-9.9 1.41 1.41m7.08 7.08 1.41 1.41"/></svg>`,
   experimental: `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v5L2 13a1 1 0 0 0 .9 1.5h10.2A1 1 0 0 0 14 13L10 7V2"/><line x1="5" y1="2" x2="11" y2="2"/></svg>`,
+  entertainment:`<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5"/><circle cx="5.2" cy="5.2" r="1"/><circle cx="10.8" cy="10.8" r="1"/><circle cx="10.8" cy="5.2" r="1"/><circle cx="5.2" cy="10.8" r="1"/></svg>`,
 };
 
 /* Chinese display labels per category */
@@ -43,6 +45,7 @@ const CATEGORY_LABELS = {
   data:         '數據',
   utility:      '工具',
   experimental: '實驗',
+  entertainment:'娛樂',
 };
 
 /* ── Status → badge class map ───────────────────────────────── */
