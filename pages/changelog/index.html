@@ -78,6 +78,32 @@
         <article class="changelog-entry">
           <time class="changelog-entry__date" datetime="2026-08-26">2026-08-26</time>
           <h3 class="changelog-entry__title">
+            QR 實驗室：量出美化 QR 的代價
+            <span class="changelog-entry__version">v1.4.0</span>
+          </h3>
+          <div class="changelog-items">
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--new">NEW</span>
+              <span>QR 實驗室：把 QR 逐軸推到解不出來為止，量出模糊、縮小、對比、遮擋、透視傾斜、雜訊六個斷點，再與同內容的素碼對照出裝飾的代價。也可以丟現成的 QR 圖片進來驗屍。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--add">ADD</span>
+              <span>五種風格（標準方塊／圓點／圓角連塊／立體積木／馬賽克）走風格註冊表，新增一種只需一個物件。每種風格都會被自動評分——實測馬賽克只剩素碼 48% 的對比餘裕。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--add">ADD</span>
+              <span>報告一律標註判定用的解碼器；瀏覽器有原生 <code style="font-family:var(--font-mono);font-size:.875em">BarcodeDetector</code> 時並列第二個獨立判定，兩者不一致本身就是資訊。每次量測前先跑正負對照，儀器不可信就不產出數字。</span>
+            </div>
+            <div class="changelog-item">
+              <span class="changelog-item__type changelog-item__type--fix">FIX</span>
+              <span>SVG 優化器恢復預覽：實測確認 ES module 動態載入在預覽沙箱的不透明來源可用（前提是伺服器送 CORS 標頭，GitHub Pages 會送），先前設為停用是量測環境造成的誤判。</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="changelog-entry">
+          <time class="changelog-entry__date" datetime="2026-08-26">2026-08-26</time>
+          <h3 class="changelog-entry__title">
             色彩工具組與編碼／雜湊工具箱，工具分類上線
             <span class="changelog-entry__version">v1.3.0</span>
           </h3>
