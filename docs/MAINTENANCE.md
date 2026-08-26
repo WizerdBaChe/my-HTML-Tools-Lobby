@@ -244,10 +244,22 @@ YYYY-MM-DD
 - `navigator.clipboard.writeText` — 常被權限政策擋下，必須準備 `document.execCommand('copy')` 退路
 - `new Worker('./worker.js')` — 外部檔案的 worker 會被擋，需改用 blob URL 建立
 - 相機 / 麥克風 — 預覽 iframe 沒有 `allow="camera"`，取用一定失敗
+- **下載** — sandbox 沒有 `allow-downloads`，`<a download>` 與 `toBlob` 存檔都不會觸發。
+  工具可以在 `window.self !== window.top` 時提示改開新分頁，但不該把下載當成核心功能。
+
+以下能力**可用**，2026-08-26 以帶 `Access-Control-Allow-Origin: *` 的 Pages 模擬伺服器實測：
+
+- classic `<script src>` — 可用（不需要 CORS）
+- `<canvas>` + `getImageData` — 可用
+- **ES module 動態載入 `import()` — 可用**，但取決於伺服器有沒有送 CORS 標頭。
+  同一支探測在沒有 CORS 標頭的伺服器上會失敗；GitHub Pages 會送 `ACAO: *`，所以在正式站上可用。
+  這一點曾經被誤判成「不可用」兩次，兩次都是量測環境的問題而非瀏覽器行為：
+  一次是巢狀 sandbox iframe 根本沒發出請求，一次是本機測試伺服器沒送 CORS 標頭。
+  **要重測時務必先跑正對照**（同一個檔案用 `fetch` 拿得到嗎？classic script 載得進來嗎？），
+  確認儀器能產出陽性，再相信它的陰性。
 
 `supportsIframe` 的判準：**工具的核心功能在上述限制下仍然完整可用**才設 `true`。
-若核心功能依賴 ES module 動態載入（`import()`）等尚未在真實沙箱中驗證過的能力，
-先設 `false`，等在正式站上確認可用再改回 `true` — 一個只會顯示錯誤訊息的預覽，比沒有預覽按鈕更糟。
+一個只會顯示錯誤訊息的預覽，比沒有預覽按鈕更糟。
 ## 更新原則
 
 ### 小更新
