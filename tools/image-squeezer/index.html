@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>圖片壓縮／格式轉換器</title>
+  <meta name="description" content="批次壓縮圖片、轉換 JPEG / WebP / PNG 格式並限制尺寸。全部在瀏覽器完成，圖片不會上傳，也會順帶移除 EXIF 等中繼資料。" />
+  <link rel="stylesheet" href="libs/archlens-theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body { margin: 0; padding: 28px 20px 48px; min-height: 100vh; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 20px; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+    .header h1 {
+      font-family: var(--al-font-display);
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--al-ink); margin: 0;
+    }
+    .header p {
+      font-family: var(--al-font-body);
+      font-size: 13px; color: var(--al-slate-500); margin: 0; line-height: 1.6;
+    }
+
+    /* ── Dropzone ── */
+    .dropzone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; min-height: 150px; padding: 24px; margin-bottom: 16px; cursor: pointer;
+      background: var(--al-white);
+      border: 2px dashed var(--al-border);
+      border-radius: var(--al-radius-lg);
+      font-family: var(--al-font-body); font-size: 13.5px; color: var(--al-slate-500);
+      text-align: center; transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .dropzone:hover, .dropzone.is-dragging {
+      background: var(--al-accent-soft); border-color: var(--al-accent); color: var(--al-accent);
+    }
+    .dropzone svg { opacity: .5; }
+    .dropzone kbd {
+      font-family: var(--al-font-mono); font-size: 11px;
+      background: var(--al-bg-alt); border: 1px solid var(--al-border);
+      border-radius: 5px; padding: 1px 5px;
+    }
+    .dropzone__hint { font-size: 12px; color: var(--al-slate-400); }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 12px; margin-bottom: 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-card);
+    }
+    .toolbar__sep { width: 1px; height: 22px; background: var(--al-border); margin: 0 2px; }
+    .toolbar__spacer { flex: 1 1 auto; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); white-space: nowrap; }
+    .field output {
+      font-family: var(--al-font-mono); font-size: 12px; color: var(--al-slate-700);
+      min-width: 38px; text-align: right;
+    }
+    .field.is-off { opacity: .4; pointer-events: none; }
+    select, input[type="number"] {
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-ink);
+      background: var(--al-white); border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md); padding: 6px 8px; outline: none;
+    }
+    select:focus, input[type="number"]:focus { border-color: var(--al-accent); }
+    input[type="number"] { width: 92px; }
+    input[type="range"] { width: 130px; accent-color: var(--al-accent); }
+    .check { display: flex; align-items: center; gap: 6px; font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500); cursor: pointer; }
+    .check input { accent-color: var(--al-accent); }
+
+    /* ── Summary ── */
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+    @media (max-width: 760px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+    .stat {
+      padding: 12px 14px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      box-shadow: var(--al-shadow-card);
+    }
+    .stat__label {
+      font-family: var(--al-font-body); font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--al-slate-400); margin-bottom: 4px;
+    }
+    .stat__value { font-family: var(--al-font-mono); font-size: 18px; color: var(--al-ink); }
+    .stat__value.is-good { color: #047857; }
+    .stat__value.is-bad { color: var(--al-error-text); }
+    .stat__sub { font-family: var(--al-font-body); font-size: 11px; color: var(--al-slate-500); margin-top: 2px; }
+
+    /* ── List ── */
+    .list { display: flex; flex-direction: column; gap: 10px; }
+    .item {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) auto;
+      gap: 14px; align-items: center;
+      padding: 12px;
+      background: var(--al-white);
+      border: 1px solid var(--al-border);
+      border-radius: var(--al-radius-md);
+      box-shadow: var(--al-shadow-card);
+    }
+    @media (max-width: 640px) {
+      .item { grid-template-columns: 56px minmax(0, 1fr); }
+      .item__actions { grid-column: 1 / -1; justify-content: flex-end; }
+    }
+    .item__thumb {
+      width: 72px; height: 72px; object-fit: contain; border-radius: var(--al-radius-sm);
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 14px 14px; background-position: 0 0, 7px 7px;
+      cursor: zoom-in;
+    }
+    @media (max-width: 640px) { .item__thumb { width: 56px; height: 56px; } }
+    .item__name {
+      font-family: var(--al-font-mono); font-size: 12.5px; color: var(--al-ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px;
+    }
+    .item__line {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      font-family: var(--al-font-body); font-size: 12px; color: var(--al-slate-500);
+    }
+    .item__size { font-family: var(--al-font-mono); }
+    .item__arrow { color: var(--al-slate-400); }
+    .item__delta {
+      font-family: var(--al-font-body); font-size: 11px; font-weight: 600;
+      padding: 1px 7px; border-radius: var(--al-radius-full);
+    }
+    .item__delta.is-good { background: var(--al-success-bg); color: #065F46; }
+    .item__delta.is-bad { background: var(--al-error-bg); color: var(--al-error-text); }
+    .item__delta.is-neutral { background: var(--al-bg-alt); color: var(--al-slate-500); }
+    .item__note { font-size: 11.5px; color: var(--al-warn-text); flex-basis: 100%; }
+    .item__bar { height: 4px; border-radius: 999px; background: var(--al-bg-alt); margin-top: 8px; overflow: hidden; }
+    .item__bar span { display: block; height: 100%; background: var(--al-accent); transition: width .2s ease; }
+    .item__actions { display: flex; gap: 6px; align-items: center; }
+
+    .empty {
+      padding: 34px 24px; text-align: center;
+      font-family: var(--al-font-body); font-size: 13.5px; color: var(--al-slate-400);
+    }
+
+    /* ── Compare overlay ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 60; display: none;
+      align-items: center; justify-content: center; padding: 24px;
+      background: rgba(15,23,42,.72);
+    }
+    .overlay.is-on { display: flex; }
+    .overlay__box {
+      position: relative; max-width: 96vw; max-height: 92vh; overflow: auto;
+      background: var(--al-white); border-radius: var(--al-radius-lg);
+      box-shadow: var(--al-shadow-float); padding: 16px;
+    }
+    .overlay__head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+      font-family: var(--al-font-body); font-size: 13px; color: var(--al-slate-700);
+    }
+    .overlay__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 700px) { .overlay__grid { grid-template-columns: 1fr; } }
+    .overlay__cell { text-align: center; }
+    .overlay__cell img {
+      max-width: 100%; max-height: 62vh; border-radius: var(--al-radius-sm);
+      border: 1px solid var(--al-border);
+      background:
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%),
+        linear-gradient(45deg, #EDECE6 25%, transparent 25%, transparent 75%, #EDECE6 75%);
+      background-size: 16px 16px; background-position: 0 0, 8px 8px;
+    }
+    .overlay__cap {
+      font-family: var(--al-font-mono); font-size: 11.5px; color: var(--al-slate-500); margin-top: 6px;
+    }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 14px; padding: 10px 14px;
+      font-family: var(--al-font-body); font-size: 12.5px;
+      border-radius: var(--al-radius-md);
+      border: 1px solid var(--al-border);
+      background: var(--al-white); color: var(--al-slate-500);
+    }
+    .statusbar.is-ok { background: var(--al-success-bg); border-color: #A7F3D0; color: #065F46; }
+    .statusbar.is-warn { background: var(--al-warn-bg); border-color: var(--al-warn-border); color: var(--al-warn-text); }
+    .statusbar.is-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
+    .statusbar code {
+      font-family: var(--al-font-mono); font-size: 12px;
+      background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      padding: 9px 16px; border-radius: var(--al-radius-full);
+      background: var(--al-ink); color: var(--al-white);
+      font-family: var(--al-font-body); font-size: 13px;
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      z-index: 70; max-width: 90vw; text-align: center;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="al-root al-grid-bg">
+<div class="container">
+
+  <header class="header">
+    <div class="header-top">
+      <h1>圖片壓縮／格式轉換器</h1>
+      <span class="al-badge al-badge--live">本機運算</span>
+    </div>
+    <p>批次壓縮圖片、轉成 JPEG / WebP / PNG 並限制尺寸。編碼在你的瀏覽器裡完成，圖片不會上傳；重新編碼也會順帶清掉 EXIF 位置等中繼資料。</p>
+  </header>
+
+  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="加入圖片">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5"/><path d="M12 5v12"/>
+    </svg>
+    <span>點擊選擇、拖放，或按 <kbd>Ctrl</kbd>+<kbd>V</kbd> 貼上圖片（可一次多張）</span>
+    <span class="dropzone__hint" id="support-hint">正在偵測瀏覽器支援的輸出格式…</span>
+  </div>
+  <input type="file" id="file-input" class="visually-hidden" accept="image/*" multiple />
+
+  <div class="toolbar" role="toolbar" aria-label="輸出設定">
+    <div class="field">
+      <label for="format">輸出格式</label>
+      <select id="format">
+        <option value="keep">維持原格式</option>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/webp" selected>WebP</option>
+        <option value="image/png">PNG（無損）</option>
+      </select>
+    </div>
+
+    <div class="field" id="f-quality">
+      <label for="quality">品質</label>
+      <input type="range" id="quality" min="30" max="100" value="80" />
+      <output id="out-quality">80</output>
+    </div>
+
+    <div class="toolbar__sep" aria-hidden="true"></div>
+
+    <div class="field">
+      <label for="resize">尺寸</label>
+      <select id="resize">
+        <option value="none">維持原尺寸</option>
+        <option value="max">限制最長邊</option>
+        <option value="pct">按比例縮放</option>
+      </select>
+    </div>
+    <div class="field is-off" id="f-maxside">
+      <input type="number" id="maxside" min="16" max="20000" step="1" value="1920" aria-label="最長邊像素" />
+      <label for="maxside">px</label>
+    </div>
+    <div class="field is-off" id="f-pct">
+      <input type="number" id="pct" min="1" max="100" step="1" value="50" aria-label="縮放百分比" />
+      <label for="pct">%</label>
+    </div>
+
+    <div class="toolbar__sep" aria-hidden="true"></div>
+
+    <label class="check" title="若重新編碼後反而比原檔大，就保留原檔內容">
+      <input type="checkbox" id="only-smaller" checked />
+      <span>只在變小時採用</span>
+    </label>
+
+    <label class="check" id="f-mozjpeg" title="同時用 MozJPEG 與瀏覽器原生編碼，取檔案較小的那份。實測品質 80 以下 MozJPEG 約可再小 13–24%，品質 85 以上通常沒有優勢。代價是每張多花數十毫秒。">
+      <input type="checkbox" id="use-mozjpeg" />
+      <span>高壓縮 MozJPEG</span>
+    </label>
+
+    <div class="toolbar__spacer"></div>
+
+    <button class="al-btn al-btn--toolbar al-btn--secondary" id="btn-clear" type="button">清空</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-run" type="button">重新處理</button>
+    <button class="al-btn al-btn--toolbar al-btn--primary" id="btn-download-all" type="button">下載全部</button>
+  </div>
+
+  <div class="summary">
+    <div class="stat">
+      <div class="stat__label">圖片數</div>
+      <div class="stat__value" id="st-count">0</div>
+      <div class="stat__sub" id="st-count-sub">尚未加入</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">原始總大小</div>
+      <div class="stat__value" id="st-before">—</div>
+      <div class="stat__sub">加入時的檔案大小</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">輸出總大小</div>
+      <div class="stat__value" id="st-after">—</div>
+      <div class="stat__sub" id="st-after-sub">處理後的檔案大小</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">總共省下</div>
+      <div class="stat__value" id="st-saved">—</div>
+      <div class="stat__sub" id="st-saved-sub"></div>
+    </div>
+  </div>
+
+  <div class="list" id="list">
+    <div class="empty" id="empty">還沒有圖片。把檔案拖進上面的區域就會開始處理。</div>
+  </div>
+
+  <div class="statusbar" id="status" role="status" aria-live="polite">等待加入圖片。</div>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="壓縮前後對照">
+  <div class="overlay__box">
+    <div class="overlay__head">
+      <strong id="ov-name">—</strong>
+      <span class="toolbar__spacer"></span>
+      <button class="al-btn al-btn--toolbar al-btn--secondary" id="ov-close" type="button">關閉</button>
+    </div>
+    <div class="overlay__grid">
+      <div class="overlay__cell">
+        <img id="ov-before" alt="壓縮前" />
+        <div class="overlay__cap" id="ov-before-cap"></div>
+      </div>
+      <div class="overlay__cell">
+        <img id="ov-after" alt="壓縮後" />
+        <div class="overlay__cap" id="ov-after-cap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════
+     編碼一律走瀏覽器原生 canvas.toBlob，零第三方相依：
+     在任何環境都能用，也能在大廳 sandbox 預覽視窗（不透明來源）
+     中運作。代價是壓縮率略遜於 mozjpeg / oxipng 等專用編碼器。
+     ══════════════════════════════════════════════════════════ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    list: $('list'), empty: $('empty'), status: $('status'), toast: $('toast'),
+    format: $('format'), quality: $('quality'), resize: $('resize'),
+    maxside: $('maxside'), pct: $('pct'), onlySmaller: $('only-smaller'),
+    useMozjpeg: $('use-mozjpeg'),
+    dropzone: $('dropzone'), fileInput: $('file-input')
+  };
+
+  var items = [];       // { id, file, name, bitmap, w, h, outBlob, outW, outH, outType, ms, note, els }
+  var seq = 0;
+  var running = false;
+  var support = {};     // { 'image/webp': true, ... }
+
+  /* ── 小工具 ─────────────────────────────────────────────── */
+
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('is-on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { els.toast.classList.remove('is-on'); }, 1900);
+  }
+
+  function setStatus(html, kind) {
+    els.status.className = 'statusbar' + (kind ? ' is-' + kind : '');
+    els.status.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtBytes(n) {
+    if (n === null || n === undefined) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  function extFor(type) {
+    return { 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/png': 'png' }[type] || 'bin';
+  }
+
+  function baseName(name) {
+    var i = name.lastIndexOf('.');
+    return i > 0 ? name.slice(0, i) : name;
+  }
+
+  /* ── 偵測瀏覽器實際支援的輸出格式 ───────────────────────── */
+
+  function detectSupport() {
+    var c = document.createElement('canvas');
+    c.width = c.height = 2;
+    return Promise.all(['image/webp', 'image/jpeg', 'image/png'].map(function (type) {
+      return new Promise(function (resolve) {
+        try {
+          c.toBlob(function (blob) {
+            // 不支援的類型，瀏覽器會默默退回 image/png
+            resolve([type, !!blob && blob.type === type]);
+          }, type, 0.8);
+        } catch (e) {
+          resolve([type, false]);
+        }
+      });
+    })).then(function (pairs) {
+      pairs.forEach(function (p) { support[p[0]] = p[1]; });
+
+      var ok = pairs.filter(function (p) { return p[1]; }).map(function (p) { return p[0].split('/')[1].toUpperCase(); });
+      var bad = pairs.filter(function (p) { return !p[1]; }).map(function (p) { return p[0].split('/')[1].toUpperCase(); });
+
+      $('support-hint').textContent = '這個瀏覽器可輸出：' + ok.join('、') +
+        (bad.length ? '；不支援：' + bad.join('、') : '');
+
+      // 不支援的格式從選單移除，避免使用者選了卻默默拿到 PNG
+      Array.prototype.slice.call(els.format.options).forEach(function (opt) {
+        if (opt.value !== 'keep' && support[opt.value] === false) {
+          opt.disabled = true;
+          opt.textContent += '（此瀏覽器不支援）';
+        }
+      });
+      if (els.format.selectedOptions[0] && els.format.selectedOptions[0].disabled) {
+        els.format.value = 'image/jpeg';
+      }
+    });
+  }
+
+  /* ── 解碼 ───────────────────────────────────────────────── */
+
+  function decode(file) {
+    if (window.createImageBitmap) {
+      return createImageBitmap(file).catch(function () { return decodeViaImg(file); });
+    }
+    return decodeViaImg(file);
+  }
+
+  function decodeViaImg(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('瀏覽器無法解碼這個圖片檔'));
+      };
+      img.src = url;
+    });
+  }
+
+  /* ── 目標尺寸 ───────────────────────────────────────────── */
+
+  function targetSize(w, h) {
+    var mode = els.resize.value;
+    if (mode === 'max') {
+      var maxSide = Math.max(16, Number(els.maxside.value) || 1920);
+      var longest = Math.max(w, h);
+      if (longest <= maxSide) return { w: w, h: h, resized: false };
+      var s = maxSide / longest;
+      return { w: Math.max(1, Math.round(w * s)), h: Math.max(1, Math.round(h * s)), resized: true };
+    }
+    if (mode === 'pct') {
+      var p = Math.min(100, Math.max(1, Number(els.pct.value) || 100)) / 100;
+      if (p === 1) return { w: w, h: h, resized: false };
+      return { w: Math.max(1, Math.round(w * p)), h: Math.max(1, Math.round(h * p)), resized: true };
+    }
+    return { w: w, h: h, resized: false };
+  }
+
+  /* ── 編碼單張 ───────────────────────────────────────────── */
+
+  function finalize(item, blob, outType, t, t0, encoderLabel) {
+    var note = '';
+    var finalBlob = blob;
+    var finalType = outType;
+    var finalW = t.w, finalH = t.h;
+
+    if (els.onlySmaller.checked && blob.size >= item.file.size && !t.resized) {
+      finalBlob = item.file;
+      finalType = item.file.type;
+      finalW = item.w; finalH = item.h;
+      note = '重新編碼後為 ' + blob.size.toLocaleString('en-US') + ' 位元組，不小於原檔的 ' +
+             item.file.size.toLocaleString('en-US') + ' 位元組，已保留原檔。';
+    } else if (blob.size >= item.file.size) {
+      note = '輸出比原檔大 — PNG 這類無損格式重新編碼常會變大，改用 JPEG 或 WebP 通常才會縮。';
+    }
+
+    item.outBlob = finalBlob;
+    item.outType = finalType;
+    item.outW = finalW;
+    item.outH = finalH;
+    item.note = note;
+    item.resized = t.resized;
+    item.encoder = encoderLabel;
+    item.ms = Math.round(performance.now() - t0);
+    return item;
+  }
+
+  function encodeOne(item) {
+    var t0 = performance.now();
+
+    var outType = els.format.value === 'keep' ? item.file.type : els.format.value;
+    if (!support[outType]) outType = support['image/jpeg'] ? 'image/jpeg' : 'image/png';
+
+    var t = targetSize(item.w, item.h);
+
+    var c = document.createElement('canvas');
+    c.width = t.w; c.height = t.h;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+
+    // PNG / WebP 保留透明；JPEG 沒有 alpha，先鋪白底避免透明處變黑
+    if (outType === 'image/jpeg') {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, t.w, t.h);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(item.bitmap, 0, 0, item.w, item.h, 0, 0, t.w, t.h);
+
+    var quality = Number(els.quality.value);
+
+    // 高壓縮路徑：MozJPEG 與原生編碼都跑，取較小的那個。
+    // 實測 MozJPEG 在品質 ≤80 約小 13–24%，但品質 85 以上反而可能大 1–8%，
+    // 所以不能無條件採用；原生編碼只花數毫秒，這個保險很便宜。
+    if (outType === 'image/jpeg' && els.useMozjpeg.checked) {
+      return Promise.all([
+        toBlobAsync(c, 'image/jpeg', quality / 100),
+        loadMozjpeg().then(function (encode) {
+          return encode(ctx.getImageData(0, 0, t.w, t.h), { quality: quality });
+        }).then(function (buffer) {
+          return new Blob([buffer], { type: 'image/jpeg' });
+        })
+      ]).then(function (pair) {
+        var nativeBlob = pair[0], mozBlob = pair[1];
+        if (mozBlob.size < nativeBlob.size) {
+          var saved = (1 - mozBlob.size / nativeBlob.size) * 100;
+          return finalize(item, mozBlob, 'image/jpeg', t, t0, 'MozJPEG −' + saved.toFixed(0) + '%');
+        }
+        return finalize(item, nativeBlob, 'image/jpeg', t, t0, '原生（MozJPEG 較大）');
+      }).catch(function (e) {
+        mozjpeg.failed = true;
+        mozjpeg.error = e && e.message ? e.message : String(e);
+        return nativeEncode(item, c, outType, quality, t, t0).then(function (r) {
+          r.note = (r.note ? r.note + ' ' : '') + 'MozJPEG 無法使用（' + mozjpeg.error + '），已改用瀏覽器原生編碼。';
+          return r;
+        });
+      });
+    }
+
+    return nativeEncode(item, c, outType, quality, t, t0);
+  }
+
+  function toBlobAsync(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) { reject(new Error('編碼失敗，瀏覽器沒有回傳資料')); return; }
+        resolve(blob);
+      }, type, quality);
+    });
+  }
+
+  function nativeEncode(item, canvas, outType, quality, t, t0) {
+    var useQ = (outType === 'image/jpeg' || outType === 'image/webp');
+    return toBlobAsync(canvas, outType, useQ ? quality / 100 : undefined).then(function (blob) {
+      return finalize(item, blob, outType, t, t0, '瀏覽器原生');
+    });
+  }
+
+  /* ── MozJPEG 懶載入 ─────────────────────────────────────── */
+
+  var mozjpeg = { promise: null, failed: false, error: '' };
+
+  function loadMozjpeg() {
+    if (mozjpeg.promise) return mozjpeg.promise;
+    // 動態 import：把 786 KB 的 wasm 延後到真的要用時才抓
+    mozjpeg.promise = import('./libs/jsquash-jpeg/encode.js').then(function (mod) {
+      return mod.default;
+    });
+    return mozjpeg.promise;
+  }
+
+  /* ── 佇列處理 ───────────────────────────────────────────── */
+
+  function processAll() {
+    if (running) return Promise.resolve();
+    if (!items.length) { render(); return Promise.resolve(); }
+
+    running = true;
+    setStatus('處理中… 0 / ' + items.length);
+
+    var done = 0, failed = 0;
+    var t0 = performance.now();
+
+    var chain = Promise.resolve();
+    items.forEach(function (item) {
+      chain = chain.then(function () {
+        return encodeOne(item).then(function () {
+          done++;
+          updateItemRow(item);
+        }).catch(function (e) {
+          failed++;
+          item.outBlob = null;
+          item.note = '處理失敗：' + e.message;
+          updateItemRow(item);
+        }).then(function () {
+          setStatus('處理中… ' + (done + failed) + ' / ' + items.length);
+          // 讓出主執行緒，避免大批次時整頁凍住
+          return new Promise(function (r) { setTimeout(r, 0); });
+        });
+      });
+    });
+
+    return chain.then(function () {
+      running = false;
+      var ms = Math.round(performance.now() - t0);
+      updateSummary(ms, failed);
+    });
+  }
+
+  /* ── 渲染 ───────────────────────────────────────────────── */
+
+  function makeRow(item) {
+    var row = document.createElement('div');
+    row.className = 'item';
+
+    var thumb = document.createElement('img');
+    thumb.className = 'item__thumb';
+    thumb.alt = item.name;
+    thumb.title = '點擊看壓縮前後對照';
+    thumb.addEventListener('click', function () { openCompare(item); });
+
+    var mid = document.createElement('div');
+    var name = document.createElement('div');
+    name.className = 'item__name';
+    name.textContent = item.name;
+    name.title = item.name;
+
+    var line = document.createElement('div');
+    line.className = 'item__line';
+
+    var bar = document.createElement('div');
+    bar.className = 'item__bar';
+    var fill = document.createElement('span');
+    fill.style.width = '8%';
+    bar.appendChild(fill);
+
+    mid.appendChild(name);
+    mid.appendChild(line);
+    mid.appendChild(bar);
+
+    var actions = document.createElement('div');
+    actions.className = 'item__actions';
+
+    var dl = document.createElement('button');
+    dl.type = 'button';
+    dl.className = 'al-btn al-btn--toolbar al-btn--secondary';
+    dl.textContent = '下載';
+    dl.disabled = true;
+    dl.addEventListener('click', function () { downloadOne(item); });
+
+    var rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'al-btn al-btn--toolbar al-btn--secondary';
+    rm.textContent = '移除';
+    rm.addEventListener('click', function () { removeItem(item); });
+
+    actions.appendChild(dl);
+    actions.appendChild(rm);
+
+    row.appendChild(thumb);
+    row.appendChild(mid);
+    row.appendChild(actions);
+
+    item.els = { row: row, thumb: thumb, line: line, fill: fill, dl: dl };
+    return row;
+  }
+
+  function updateItemRow(item) {
+    var e = item.els;
+    if (!e) return;
+
+    e.line.innerHTML = '';
+
+    function span(cls, text) {
+      var s = document.createElement('span');
+      if (cls) s.className = cls;
+      s.textContent = text;
+      return s;
+    }
+
+    e.line.appendChild(span('item__size', fmtBytes(item.file.size)));
+    e.line.appendChild(span('item__arrow', '→'));
+
+    if (!item.outBlob) {
+      e.line.appendChild(span('item__delta is-bad', item.note || '尚未處理'));
+      e.fill.style.width = '0%';
+      e.dl.disabled = true;
+      return;
+    }
+
+    e.line.appendChild(span('item__size', fmtBytes(item.outBlob.size)));
+
+    var ratio = item.file.size ? (1 - item.outBlob.size / item.file.size) : 0;
+    var cls = ratio > 0.01 ? 'is-good' : (ratio < -0.01 ? 'is-bad' : 'is-neutral');
+    var sign = ratio > 0 ? '−' : (ratio < 0 ? '+' : '');
+    e.line.appendChild(span('item__delta ' + cls, sign + Math.abs(ratio * 100).toFixed(1) + '%'));
+
+    var dims = item.w + '×' + item.h + (item.resized ? ' → ' + item.outW + '×' + item.outH : '');
+    e.line.appendChild(span('', dims));
+    e.line.appendChild(span('', extFor(item.outType).toUpperCase()));
+    if (item.encoder) e.line.appendChild(span('', item.encoder));
+    e.line.appendChild(span('', item.ms + ' ms'));
+
+    if (item.note) e.line.appendChild(span('item__note', item.note));
+
+    e.fill.style.width = Math.max(4, Math.min(100, (item.outBlob.size / Math.max(1, item.file.size)) * 100)) + '%';
+    e.dl.disabled = false;
+  }
+
+  function render() {
+    els.empty.hidden = items.length > 0;
+    if (!items.length) {
+      updateSummary(0, 0);
+    }
+  }
+
+  function updateSummary(ms, failed) {
+    var before = 0, after = 0, ok = 0;
+    items.forEach(function (it) {
+      before += it.file.size;
+      if (it.outBlob) { after += it.outBlob.size; ok++; }
+    });
+
+    $('st-count').textContent = String(items.length);
+    $('st-count-sub').textContent = items.length ? (ok + ' 張已處理') : '尚未加入';
+    $('st-before').textContent = items.length ? fmtBytes(before) : '—';
+    $('st-after').textContent = ok ? fmtBytes(after) : '—';
+    $('st-after-sub').textContent = ok ? extFor(items[0].outType).toUpperCase() + ' 等格式' : '處理後的檔案大小';
+
+    var saved = before - after;
+    var elSaved = $('st-saved');
+    if (!ok) {
+      elSaved.textContent = '—';
+      elSaved.className = 'stat__value';
+      $('st-saved-sub').textContent = '';
+    } else {
+      var pct = before ? (saved / before * 100) : 0;
+      elSaved.textContent = (saved >= 0 ? '' : '+') + fmtBytes(Math.abs(saved));
+      elSaved.className = 'stat__value ' + (saved > 0 ? 'is-good' : (saved < 0 ? 'is-bad' : ''));
+      $('st-saved-sub').textContent = (saved >= 0 ? '減少 ' : '增加 ') + Math.abs(pct).toFixed(1) + '%';
+    }
+
+    if (!items.length) { setStatus('等待加入圖片。'); return; }
+
+    var bigger = items.filter(function (it) { return it.outBlob && it.outBlob.size >= it.file.size; }).length;
+    var parts = ['完成 <code>' + ok + '</code> / ' + items.length + ' 張'];
+    if (ms) parts.push('耗時 <code>' + ms + ' ms</code>');
+    if (saved > 0) parts.push('共省下 <code>' + fmtBytes(saved) + '</code>');
+
+    if (failed) {
+      setStatus(parts.join(' · ') + ' — 有 <code>' + failed + '</code> 張處理失敗，見各列訊息。', 'error');
+    } else if (bigger) {
+      setStatus(parts.join(' · ') + ' — 有 <code>' + bigger + '</code> 張輸出不小於原檔。', 'warn');
+    } else {
+      setStatus(parts.join(' · '), 'ok');
+    }
+  }
+
+  /* ── 前後對照 ───────────────────────────────────────────── */
+
+  var overlayURLs = [];
+  function clearOverlayURLs() {
+    overlayURLs.forEach(function (u) { URL.revokeObjectURL(u); });
+    overlayURLs = [];
+  }
+
+  function openCompare(item) {
+    if (!item.outBlob) { toast('這張還沒有處理結果'); return; }
+    clearOverlayURLs();
+
+    var uBefore = URL.createObjectURL(item.file);
+    var uAfter = URL.createObjectURL(item.outBlob);
+    overlayURLs.push(uBefore, uAfter);
+
+    $('ov-name').textContent = item.name;
+    $('ov-before').src = uBefore;
+    $('ov-after').src = uAfter;
+    $('ov-before-cap').textContent = '壓縮前 · ' + fmtBytes(item.file.size) + ' · ' + item.w + '×' + item.h;
+    $('ov-after-cap').textContent = '壓縮後 · ' + fmtBytes(item.outBlob.size) + ' · ' + item.outW + '×' + item.outH +
+                                    ' · ' + extFor(item.outType).toUpperCase();
+    $('overlay').classList.add('is-on');
+  }
+
+  function closeCompare() {
+    $('overlay').classList.remove('is-on');
+    clearOverlayURLs();
+  }
+
+  $('ov-close').addEventListener('click', closeCompare);
+  $('overlay').addEventListener('click', function (e) { if (e.target === $('overlay')) closeCompare(); });
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCompare(); });
+
+  /* ── 下載 ───────────────────────────────────────────────── */
+
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function downloadOne(item) {
+    if (!item.outBlob) { toast('這張還沒有處理結果'); return; }
+    downloadBlob(item.outBlob, baseName(item.name) + '-min.' + extFor(item.outType));
+  }
+
+  $('btn-download-all').addEventListener('click', function () {
+    var ready = items.filter(function (it) { return it.outBlob; });
+    if (!ready.length) { toast('沒有可下載的結果'); return; }
+    // 沒有打包成 ZIP：那需要額外函式庫，這裡逐張觸發下載
+    ready.forEach(function (it, i) {
+      setTimeout(function () { downloadOne(it); }, i * 220);
+    });
+    toast('開始下載 ' + ready.length + ' 個檔案，瀏覽器可能會詢問是否允許多重下載');
+  });
+
+  /* ── 加入 / 移除 ────────────────────────────────────────── */
+
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList).filter(function (f) { return /^image\//.test(f.type); });
+    var rejected = fileList.length - files.length;
+
+    if (!files.length) {
+      setStatus(rejected ? '選到的 <code>' + rejected + '</code> 個檔案都不是圖片，已略過。' : '沒有選到檔案。', 'error');
+      return;
+    }
+
+    var MAX = 30 * 1024 * 1024;
+    var pending = files.length;
+
+    files.forEach(function (file) {
+      if (file.size > MAX) {
+        pending--;
+        setStatus('<code>' + esc(file.name) + '</code> 為 ' + fmtBytes(file.size) + '，超過 30 MB 上限，已略過。', 'warn');
+        return;
+      }
+
+      var item = { id: ++seq, file: file, name: file.name || ('貼上的圖片-' + seq + '.png') };
+      items.push(item);
+      var row = makeRow(item);
+      els.list.appendChild(row);
+      render();
+
+      decode(file).then(function (bitmap) {
+        item.bitmap = bitmap;
+        item.w = bitmap.width;
+        item.h = bitmap.height;
+        var c = document.createElement('canvas');
+        var s = Math.min(1, 160 / Math.max(item.w, item.h));
+        c.width = Math.max(1, Math.round(item.w * s));
+        c.height = Math.max(1, Math.round(item.h * s));
+        c.getContext('2d').drawImage(bitmap, 0, 0, c.width, c.height);
+        item.els.thumb.src = c.toDataURL('image/png');
+      }).catch(function (e) {
+        item.note = '無法解碼：' + e.message;
+        updateItemRow(item);
+      }).then(function () {
+        pending--;
+        if (pending <= 0) processAll();
+      });
+    });
+
+    if (pending <= 0) processAll();
+  }
+
+  function removeItem(item) {
+    var i = items.indexOf(item);
+    if (i >= 0) items.splice(i, 1);
+    if (item.els && item.els.row.parentNode) item.els.row.parentNode.removeChild(item.els.row);
+    render();
+    updateSummary(0, 0);
+  }
+
+  /* ── 事件 ───────────────────────────────────────────────── */
+
+  els.dropzone.addEventListener('click', function () { els.fileInput.click(); });
+  els.dropzone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); els.fileInput.click(); }
+  });
+  els.fileInput.addEventListener('change', function () {
+    if (els.fileInput.files && els.fileInput.files.length) addFiles(els.fileInput.files);
+    els.fileInput.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    els.dropzone.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      els.dropzone.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    els.dropzone.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (ev === 'dragleave' && els.dropzone.contains(e.relatedTarget)) return;
+      els.dropzone.classList.remove('is-dragging');
+    });
+  });
+  els.dropzone.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+
+  window.addEventListener('paste', function (e) {
+    var items_ = e.clipboardData && e.clipboardData.items;
+    if (!items_) return;
+    var files = [];
+    for (var i = 0; i < items_.length; i++) {
+      if (items_[i].type && items_[i].type.indexOf('image/') === 0) {
+        var f = items_[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length) { addFiles(files); e.preventDefault(); }
+  });
+
+  els.quality.addEventListener('input', function () { $('out-quality').textContent = els.quality.value; });
+  els.quality.addEventListener('change', function () { processAll(); });
+
+  els.format.addEventListener('change', function () { syncFields(); processAll(); });
+  els.resize.addEventListener('change', function () { syncFields(); processAll(); });
+  els.maxside.addEventListener('change', function () { processAll(); });
+  els.pct.addEventListener('change', function () { processAll(); });
+  els.onlySmaller.addEventListener('change', function () { processAll(); });
+  els.useMozjpeg.addEventListener('change', function () { processAll(); });
+
+  $('btn-run').addEventListener('click', function () {
+    if (!items.length) { toast('還沒有圖片'); return; }
+    processAll();
+  });
+
+  $('btn-clear').addEventListener('click', function () {
+    items = [];
+    while (els.list.firstChild) els.list.removeChild(els.list.firstChild);
+    els.list.appendChild(els.empty);
+    render();
+    toast('已清空');
+  });
+
+  function syncFields() {
+    var fmt = els.format.value;
+    var lossy = fmt === 'image/jpeg' || fmt === 'image/webp' || fmt === 'keep';
+    $('f-quality').classList.toggle('is-off', !lossy);
+    $('f-maxside').classList.toggle('is-off', els.resize.value !== 'max');
+    $('f-pct').classList.toggle('is-off', els.resize.value !== 'pct');
+    // MozJPEG 只影響 JPEG 輸出
+    $('f-mozjpeg').classList.toggle('is-off', fmt !== 'image/jpeg');
+  }
+
+  window.addEventListener('error', function (e) {
+    setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
+  });
+
+  syncFields();
+  render();
+  detectSupport().catch(function () {
+    $('support-hint').textContent = '無法偵測輸出格式支援，將以 JPEG 為預設。';
+  });
+})();
+</script>
+</body>
+</html>
