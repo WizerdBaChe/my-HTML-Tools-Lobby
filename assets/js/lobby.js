@@ -66,13 +66,65 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 【防呆修正】只有當頁面存在主要的大廳網格時，才初始化大廳專用的資料載入與事件綁定
   if ($allGrid) {
+    readStateFromURL();
     loadTools();
+
+    // Back / Forward restore the view instead of leaving the site.
+    window.addEventListener('popstate', () => {
+      readStateFromURL();
+      applyStateToControls();
+      render();
+    });
   }
   
   // 基礎事件與導覽列標明不受頁面限制，皆可安全執行
   bindEvents();
   highlightCurrentNav();
 });
+
+/* ── View state in the URL ──────────────────────────────────
+ * The lobby's view (search / category / sort) lives in the query string so a
+ * filtered view can be linked, survives reload, and is undone by Back.
+ * Guarded by $allGrid for the same reason the loader is: lobby.js is also
+ * loaded by pages/about and pages/changelog, and by tool pages that own their
+ * own query parameters — this must never touch a page that has no lobby grid.
+ */
+const URL_DEFAULTS = { q: '', cat: 'all', sort: 'order' };
+
+function readStateFromURL() {
+  const p = new URLSearchParams(location.search);
+  state.query    = p.get('q')    ?? URL_DEFAULTS.q;
+  state.category = p.get('cat')  ?? URL_DEFAULTS.cat;
+  state.sort     = p.get('sort') ?? URL_DEFAULTS.sort;
+}
+
+/* mode: 'push' for a discrete choice (category, sort) so Back undoes it;
+ * 'replace' while typing, so one search does not bury the previous page under
+ * a history entry per keystroke. Stated rather than implied: search is the one
+ * dimension deliberately excluded from the Back contract. */
+function writeStateToURL(mode) {
+  const p = new URLSearchParams();
+  if (state.query.trim())                 p.set('q', state.query.trim());
+  if (state.category !== URL_DEFAULTS.cat)  p.set('cat', state.category);
+  if (state.sort     !== URL_DEFAULTS.sort) p.set('sort', state.sort);
+
+  const qs  = p.toString();
+  const url = location.pathname + (qs ? `?${qs}` : '') + location.hash;
+  if (url === location.pathname + location.search + location.hash) return;
+  history[mode === 'push' ? 'pushState' : 'replaceState'](null, '', url);
+}
+
+/* Reflect state into the controls without writing history (restore path). */
+function applyStateToControls() {
+  if ($searchInput && $searchInput.value !== state.query) $searchInput.value = state.query;
+  if ($sortSelect  && $sortSelect.value  !== state.sort)  $sortSelect.value  = state.sort;
+
+  document.querySelectorAll('[data-category]').forEach(btn => {
+    const active = btn.dataset.category === state.category;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
 
 function cacheDOM() {
   $searchInput    = document.getElementById('search-input');
@@ -109,6 +161,7 @@ async function loadTools() {
   }
 
   buildCategoryFilters();
+  applyStateToControls();   // a view restored from the URL survives the rebuild
   render();
 }
 
@@ -254,9 +307,10 @@ function buildCategoryFilters() {
   container.innerHTML = categories.map(cat => {
     const icon  = CATEGORY_SVG[cat] || '';
     const label = CATEGORY_LABELS[cat] || cat;
-    return `<button class="filter-btn${cat === 'all' ? ' is-active' : ''}"
+    const active = cat === state.category;
+    return `<button class="filter-btn${active ? ' is-active' : ''}"
             data-category="${escAttr(cat)}"
-            aria-pressed="${cat === 'all' ? 'true' : 'false'}"
+            aria-pressed="${active ? 'true' : 'false'}"
             aria-label="${cat === 'all' ? '顯示全部工具' : `篩選分類：${label}`}">
       ${icon}<span>${label}</span>
     </button>`;
@@ -276,6 +330,7 @@ function bindEvents() {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         state.query = $searchInput.value;
+        writeStateToURL('replace');
         render();
       }, 180);
     });
@@ -285,6 +340,7 @@ function bindEvents() {
   if ($sortSelect) {
     $sortSelect.addEventListener('change', () => {
       state.sort = $sortSelect.value;
+      writeStateToURL('push');
       render();
     });
   }
@@ -312,13 +368,8 @@ function bindEvents() {
 
 function setCategory(cat) {
   state.category = cat;
-
-  document.querySelectorAll('[data-category]').forEach(btn => {
-    const active = btn.dataset.category === cat;
-    btn.classList.toggle('is-active', active);
-    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  });
-
+  applyStateToControls();
+  writeStateToURL('push');
   render();
 }
 
