@@ -120,18 +120,136 @@ t('toolsFor filters, sorts by order, drops tools without accepts, keeps universa
   assert.deepEqual(C.toolsFor(tools, 'json-csv').map(x => x.id), ['d']);
   assert.deepEqual(C.toolsFor(tools, 'unknown').map(x => x.id), ['b', 'a', 'd']);
 });
-t('paging: 8 slots, nulls pad, 9 tools -> 2 pages', () => {
-  const nine = Array.from({ length: 9 }, (_, i) => ({ id: i }));
-  assert.equal(C.pageCount(9), 2); assert.equal(C.pageCount(8), 1); assert.equal(C.pageCount(0), 1);
-  assert.equal(C.pageSlots(nine, 0).filter(Boolean).length, 8);
-  const p2 = C.pageSlots(nine, 1);
-  assert.equal(p2.length, 8); assert.equal(p2[0].id, 8); assert.equal(p2[1], null);
-});
 t('toolTakesAny re-filter at drop', () => {
   assert.equal(C.toolTakesAny({ accepts: ['image'] }, ['svg']), false);
   assert.equal(C.toolTakesAny({ accepts: ['image'] }, ['svg', 'image']), true);
   assert.equal(C.toolTakesAny({ accepts: ['image'] }, ['unknown']), true);
   assert.equal(C.toolTakesAny({ accepts: ['other'] }, ['svg']), true);
+});
+
+// --- level 2 / loadout model ---
+const mk = (id, order, extra = {}) => ({ id, name: id.toUpperCase(), order, accepts: ['image'], ...extra });
+t('slotAt is the fixed-8 selector (alias of sectorAt)', () => {
+  assert.equal(C.slotAt, C.sectorAt);
+  assert.equal(C.SECTORS, 8);
+});
+t('shouldExpand: group slot at 1.29x does NOT expand, 1.31x does', () => {
+  assert.equal(C.shouldExpand(...polar(90, 1.29 * R), R, 2), false);
+  assert.equal(C.shouldExpand(...polar(90, 1.31 * R), R, 2), true);
+});
+t('shouldExpand: only in the slot\'s own direction', () => {
+  assert.equal(C.shouldExpand(...polar(0, 2 * R), R, 2), false);
+  assert.equal(C.shouldExpand(...polar(44, 2 * R), R, 1), true);
+  assert.equal(C.shouldExpand(...polar(44, 2 * R), R, 2), false);
+});
+t('leaf slot at 5x radius: no expansion concept applies, direction still selects', () => {
+  // expansion is only asked for group slots; the leaf path is plain slotAt
+  assert.equal(C.slotAt(...polar(180, 5 * R), INNER), 4);
+});
+t('shouldExpand never fires at the exact centre', () => {
+  assert.equal(C.shouldExpand(0, 0, R, 0), false);
+});
+
+const imgTools = [
+  mk('a', 1), mk('b', 2, { group: 'Fam' }), mk('c', 3, { group: 'Fam' }), mk('d', 4, { group: 'Solo' }), mk('e', 5),
+  { id: 'svgonly', order: 0, name: 'S', accepts: ['svg'], group: 'Fam' }
+];
+t('buildLibrary: group forms from >=2 members, 1-member group collapses to leaf', () => {
+  const lib = C.buildLibrary(imgTools, 'image');
+  assert.deepEqual(lib.map(x => x.id), ['a', 'group:Fam', 'd', 'e']);
+  assert.equal(lib[1].type, 'group');
+  assert.deepEqual(lib[1].children.map(x => x.id), ['b', 'c']);
+  assert.equal(lib[2].type, 'tool'); // Solo collapsed
+});
+t('buildLibrary: group membership is per kind (svg-only tool does not join image group)', () => {
+  assert.deepEqual(C.buildLibrary(imgTools, 'svg').map(x => x.id), ['svgonly']);
+});
+t('defaultLoadout: <=8 items fill 0..n-1 in order, rest null (angles fixed)', () => {
+  const lib = C.buildLibrary(imgTools, 'image');
+  assert.deepEqual(C.defaultLoadout(lib), ['a', 'group:Fam', 'd', 'e', null, null, null, null]);
+});
+const many = Array.from({ length: 11 }, (_, i) => mk('t' + i, i));
+t('defaultLoadout: 9+ items -> first 7 plus the auto More group in slot 7', () => {
+  const lib = C.buildLibrary(many, 'image');
+  const d = C.defaultLoadout(lib);
+  assert.deepEqual(d.slice(0, 7), ['t0', 't1', 't2', 't3', 't4', 't5', 't6']);
+  assert.equal(d[7], C.MORE_ID);
+  const slots = C.materializeSlots(d, lib);
+  assert.equal(slots[7].name, '更多');
+  assert.deepEqual(slots[7].children.map(x => x.id), ['t7', 't8', 't9', 't10']);
+});
+t('defaultLoadout: exactly 8 items need no More group', () => {
+  const lib = C.buildLibrary(many.slice(0, 8), 'image');
+  assert.equal(C.defaultLoadout(lib).includes(C.MORE_ID), false);
+});
+t('More group holds at most 8 children; the rest lives only in the library', () => {
+  const lots = Array.from({ length: 20 }, (_, i) => mk('u' + i, i));
+  const lib = C.buildLibrary(lots, 'image');
+  const slots = C.materializeSlots(C.defaultLoadout(lib), lib);
+  assert.equal(slots[7].children.length, 8);
+  assert.equal(lib.length, 20);
+});
+t('resolveLoadout: stale id dropped to null and reported; others untouched', () => {
+  const lib = C.buildLibrary(imgTools, 'image');
+  const r = C.resolveLoadout(['a', 'gone', 'd', null, 'e', null, null, null], lib);
+  assert.deepEqual(r.slots, ['a', null, 'd', null, 'e', null, null, null]);
+  assert.deepEqual(r.dropped, ['gone']);
+  assert.equal(r.usedDefault, false);
+});
+t('resolveLoadout: tool that no longer accepts the kind counts as stale', () => {
+  const lib = C.buildLibrary(imgTools, 'svg');           // only svgonly available
+  const r = C.resolveLoadout(['a', 'svgonly', null, null, null, null, null, null], lib);
+  assert.deepEqual(r.slots.slice(0, 2), [null, 'svgonly']);
+  assert.deepEqual(r.dropped, ['a']);
+});
+t('resolveLoadout: duplicates and non-strings dropped; explicit empty slots preserved', () => {
+  const lib = C.buildLibrary(imgTools, 'image');
+  const r = C.resolveLoadout(['a', 'a', 7, null, null, null, null, null], lib);
+  assert.deepEqual(r.slots, ['a', null, null, null, null, null, null, null]);
+  assert.equal(r.dropped.length, 2);
+});
+t('resolveLoadout: corrupt shapes (null, object, string, wrong length) fall back to default', () => {
+  const lib = C.buildLibrary(imgTools, 'image');
+  const def = C.defaultLoadout(lib);
+  for (const bad of [null, undefined, {}, 'x', 42, ['a'], new Array(9).fill('a')]) {
+    const r = C.resolveLoadout(bad, lib);
+    assert.deepEqual(r.slots, def);
+    assert.equal(r.usedDefault, true);
+  }
+});
+t('corrupted JSON text: JSON.parse throws, caller default path gives default loadout', () => {
+  let parsed; try { parsed = JSON.parse('{not json'); } catch { parsed = undefined; }
+  const lib = C.buildLibrary(imgTools, 'image');
+  assert.deepEqual(C.resolveLoadout(parsed, lib).slots, C.defaultLoadout(lib));
+});
+t('resolveLoadout accepts the auto More id', () => {
+  const lib = C.buildLibrary(many, 'image');
+  assert.equal(C.resolveLoadout([null, null, null, null, null, null, null, C.MORE_ID], lib).slots[7], C.MORE_ID);
+});
+t('loadoutKey maps mixed/unlisted to unknown', () => {
+  assert.equal(C.loadoutKey('image'), 'image');
+  assert.equal(C.loadoutKey('mixed'), 'unknown');
+  assert.equal(C.loadoutKey('whatever'), 'unknown');
+});
+
+const lib2 = C.buildLibrary(imgTools, 'image');
+const slots2 = C.materializeSlots(C.defaultLoadout(lib2), lib2);   // a, Fam(b,c), d, e
+t('resolveDrop level 1: leaf slot -> its id', () => {
+  assert.equal(C.resolveDrop({ level: 1, slots: slots2, idx: 0 }), 'a');
+});
+t('resolveDrop level 1: unexpanded group -> default child (children[0])', () => {
+  assert.equal(C.resolveDrop({ level: 1, slots: slots2, idx: 1 }), 'b');
+});
+t('resolveDrop level 1: dead zone and empty slot -> cancel', () => {
+  assert.equal(C.resolveDrop({ level: 1, slots: slots2, idx: -1 }), null);
+  assert.equal(C.resolveDrop({ level: 1, slots: slots2, idx: 6 }), null);
+});
+t('resolveDrop level 2: sub slot -> child; sub dead zone -> default child; empty sub slot -> cancel', () => {
+  const sub = (idx) => ({ level: 2, slots: slots2, idx: 1, sub: { item: slots2[1], idx } });
+  assert.equal(C.resolveDrop(sub(1)), 'c');
+  assert.equal(C.resolveDrop(sub(0)), 'b');
+  assert.equal(C.resolveDrop(sub(-1)), 'b');
+  assert.equal(C.resolveDrop(sub(5)), null);
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
