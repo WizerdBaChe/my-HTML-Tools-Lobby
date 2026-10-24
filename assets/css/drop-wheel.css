@@ -74,3 +74,63 @@
   .dw-backdrop, .dw-wheel { animation: none; }
   .dw-sector, .dw-label { transition: none; }
 }
+
+/* ── level 2 / group marker ─────────────────────────────── */
+.dw-wheel--sub { z-index: 9003; }
+.dw-wheel.is-behind { opacity: .28; transition: opacity 120ms; }
+.dw-chevron { fill: none; stroke: var(--ink-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.dw-sector.is-hover ~ .dw-chevron { stroke: var(--paper); }
+.dw-label.is-group { font-style: normal; }
+.dw-toast { z-index: 9004; }
+
+/* ── config entry + dialog (drop-wheel-config.js) ───────── */
+.dw-config-btn { height: 36px; }
+
+.dwc {
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
+  padding: var(--space-5); border: 1px solid var(--shelf); border-radius: var(--radius-md);
+  background: var(--paper); color: var(--ink); box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans); overflow: auto;
+}
+.dwc::backdrop { background: rgba(26, 23, 20, 0.45); }
+.dwc__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.dwc__title { font: 700 1.15rem/1.3 var(--font-serif); }
+.dwc__lead { margin: var(--space-2) 0 var(--space-4); font-size: var(--text-sm); color: var(--ink-secondary); line-height: 1.55; }
+.dwc__sub { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-sm); color: var(--ink-secondary); }
+.dwc__tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.dwc__tab {
+  height: 30px; padding: 0 var(--space-3); background: transparent; color: var(--ink-secondary);
+  border: 1px solid var(--warm-mid); border-radius: var(--radius-sm); font: 500 var(--text-sm) var(--font-sans); cursor: pointer;
+}
+.dwc__tab:hover { border-color: var(--shelf); background: var(--accent-soft); }
+.dwc__tab.is-active { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+.dwc__tab:focus-visible, .dwc-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dwc__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.dwc-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dwc-cell__dir { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-muted); letter-spacing: .06em; }
+.dwc-select {
+  width: 100%; min-width: 0; height: 34px; padding: 0 var(--space-2); background: var(--surface);
+  border: 1px solid var(--warm-mid); border-radius: var(--radius-sm); color: var(--ink);
+  font: 400 var(--text-sm) var(--font-sans); text-overflow: ellipsis;
+}
+.dwc-centre {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 1px dashed var(--shelf); border-radius: var(--radius-sm); color: var(--ink-muted);
+  font-size: var(--text-xs); padding: var(--space-2);
+}
+.dwc__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+.dwc__state { font-size: var(--text-xs); color: var(--ink-muted); }
+.dwc-lib { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-sm); }
+.dwc-lib__item { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--warm-mid); border-radius: var(--radius-sm); }
+.dwc-lib__sub { font-size: var(--text-xs); color: var(--ink-muted); }
+.dwc-lib__none { color: var(--ink-muted); }
+
+/* narrow: the compass grid becomes a plain list in slot order (N first) */
+@media (max-width: 520px) {
+  .dwc { padding: var(--space-4); }
+  .dwc__grid { grid-template-columns: 1fr; }
+  .dwc-cell { grid-row: auto !important; grid-column: auto !important; flex-direction: row; align-items: center; gap: var(--space-3); }
+  .dwc-cell__dir { width: 3.2em; flex: none; }
+  .dwc-centre { display: none; }
+}
