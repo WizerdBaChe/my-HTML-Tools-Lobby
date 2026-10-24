@@ -183,6 +183,7 @@
 		"supportsIframe": true,
 		"accepts": ["image"],
 		"group": "圖片轉檔",
+		"groupDefault": true,
 		"handoff": true,
 		"status": "ready",
 		"featured": true,
