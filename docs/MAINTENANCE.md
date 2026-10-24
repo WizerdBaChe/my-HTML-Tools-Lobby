@@ -134,8 +134,28 @@ Lobby 只負責：
 - `isNew`
 - `order`
 - `updatedAt`
+- `accepts`、`handoff`（選填，見下方「拖放輪盤欄位」）
 
 若為外部檔案，參照 [## 新增工具流程 > **外部工具（獨立 repo）**]
+### 拖放輪盤欄位（選填）
+
+大廳的「拖放輪盤」(drop wheel) 是一個啟動器功能：把檔案從作業系統拖到大廳頁，按一下 Shift，
+就會叫出只列出「收得了這類檔案」的工具的輪盤。實作在 `assets/js/drop-wheel.js`（介面）與
+`assets/js/drop-wheel-geom.js`（純函式，測試：`node tests/drop-wheel.test.mjs`），不屬於 `lobby.js`。
+
+- `accepts`：字串陣列，值取自 `image`、`svg`、`json-csv`、`text-code`、`other`。
+  `other` 代表「任何檔案都能收」，會出現在每一種檔案的輪盤上。
+  **沒有 `accepts` 的工具永遠不會出現在輪盤上。** 只有工具頁面真的有檔案輸入
+  （`<input type=file>` 或 drop 處理）時才填，並以該工具實際接受的類型為準。
+  外部工具（完整 URL）不會出現在輪盤上。
+- `handoff`：布林，`true` 代表該工具實作了檔案接收端，輪盤放開後檔案會直接帶進去；
+  沒有則只開啟工具，輪盤中央會提示「開啟後請再選一次檔案」。
+
+接收端協定（僅同源，雙向檢查 `event.origin === location.origin`）：
+工具以 `window.open` 從大廳開啟 → 工具對 `window.opener` 送 `{type:'lobby-handoff-ready'}`
+→ 大廳回 `{type:'lobby-handoff', files:[File...]}`。接收端只應在 `window.opener` 存在時啟動，
+並驗證 `event.source === window.opener`。範例：`tools/image-squeezer/index.html` 結尾的 handoff 區塊。
+
 ### 狀態值
 
 建議固定使用：
