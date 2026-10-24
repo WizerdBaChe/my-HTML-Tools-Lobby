@@ -7,8 +7,9 @@
  *
  * Model: level 1 = 8 FIXED slots (N, NE, ... NW; index 0 = N, clockwise) filled
  * from a per-file-kind loadout (localStorage, editable in drop-wheel-config.js).
- * A slot may hold a group; flinging past 1.3 x outer radius in its direction
- * expands a same-shape level-2 wheel at the crossing point.
+ * A slot may hold a group (max 5 children): pulling out past the ring (1.0 R)
+ * in its direction fans the children out as an arc band on the same centre;
+ * pulling back below 0.9 R collapses it. Selection is direction-only.
  *
  * Handoff protocol (same origin only, checked both ways):
  *   tool  -> opener : { type: 'lobby-handoff-ready' }
@@ -36,14 +37,14 @@
   var kind = 'unknown';
   var slots = [];          // 8 materialized slot items for the current drag
   var wheelOpen = false;
-  var level = 1;
-  var sub = null;          // { item, fromIdx, center, hover }
-  var noExpandIdx = -1;    // after collapsing, don't re-expand until the pointer leaves
+  var fan = { open: false, group: -1 };   // fan band state (hysteresis), see Core.fanStep
+  var fanEls = [];         // { path, label } of the open fan band
+  var lastKey = '';        // last applied hover descriptor (skip redundant DOM writes)
   var prevShift = null;    // null until first dragover of a drag (no edge on the first sample)
   var cursor = { x: 0, y: 0 };
   var radius = 220;
   var hover = -1;
-  var hintEl, backdropEl, toastEl, w1, w2;
+  var hintEl, backdropEl, toastEl, w1;
 
   /* ── loadout store (per viewer; must work when storage throws) ───────── */
 
@@ -127,9 +128,9 @@
     return e;
   }
 
-  /** One wheel (level 1 or level 2): SVG ring + labels + centre text. */
+  /** The wheel: SVG ring + labels + centre text. */
   function makeWheel(extraCls) {
-    var w = { r: 220, cx: 0, cy: 0, sectors: [], labels: [] };
+    var w = { r: 220, cx: 0, cy: 0, sectors: [], labels: [], chevrons: [] };
     w.root = el('div', 'dw-wheel ' + (extraCls || ''), document.body);
     w.root.hidden = true;
     w.root.setAttribute('role', 'presentation');
@@ -177,7 +178,7 @@
     w.svg.setAttribute('height', size);
     while (w.svg.firstChild) w.svg.removeChild(w.svg.firstChild);
     w.labels.forEach(function (l) { l.remove(); });
-    w.sectors = []; w.labels = [];
+    w.sectors = []; w.labels = []; w.chevrons = [];
     // Side sectors are only (outer - inner) wide horizontally; keep a margin so
     // long names wrap inside the ring instead of touching its edge.
     var cw = Math.max(64, r * 0.4);
@@ -194,6 +195,7 @@
         c.setAttribute('d', chevronPath(r, i));
         c.setAttribute('class', 'dw-chevron');
         w.svg.appendChild(c);
+        w.chevrons[i] = c;
       }
       var lab = el('div', 'dw-label' + (it ? '' : ' is-empty') + (it && it.type === 'group' ? ' is-group' : ''), w.root);
       var pt = polarPoint(r, i * 45, r * 0.75);
@@ -219,7 +221,6 @@
     backdropEl = el('div', 'dw-backdrop', document.body);
     backdropEl.hidden = true;
     w1 = makeWheel('');
-    w2 = makeWheel('dw-wheel--sub');
     toastEl = el('div', 'dw-toast', document.body);
     toastEl.setAttribute('role', 'status');
     toastEl.setAttribute('aria-live', 'polite');
@@ -238,44 +239,87 @@
     w.title.textContent = title; w.desc.textContent = desc; w.note.textContent = note;
   }
 
-  /** Raw sector under the pointer for the active level (-1 = dead zone). */
-  function rawIdx() {
-    var w = level === 2 ? w2 : w1;
-    return Core.slotAt(cursor.x - w.cx, cursor.y - w.cy, w.r * 0.5);
+  /** Pointer offset from the wheel centre (state, not layout: no DOM read per event). */
+  function offsets() { return { dx: cursor.x - w1.cx, dy: cursor.y - w1.cy }; }
+
+  function ringPath(r, r0, r1, a0, a1) {
+    var p0 = polarPoint(r, a0, r1), p1 = polarPoint(r, a1, r1);
+    var p2 = polarPoint(r, a1, r0), p3 = polarPoint(r, a0, r0);
+    return 'M' + p0.x + ' ' + p0.y + ' A' + r1 + ' ' + r1 + ' 0 0 1 ' + p1.x + ' ' + p1.y +
+           ' L' + p2.x + ' ' + p2.y + ' A' + r0 + ' ' + r0 + ' 0 0 0 ' + p3.x + ' ' + p3.y + ' Z';
+  }
+
+  /** Draw the fan band of the open group: children on the same centre, beyond the ring. */
+  function renderFan(groupIdx) {
+    var R = w1.r, item = slots[groupIdx];
+    var lay = Core.fanLayout(item.children.length);
+    var gap = 1.5, cw = Math.max(64, R * 0.5);
+    lay.forEach(function (off, i) {
+      var ang = groupIdx * 45 + off, half = Core.FAN_SPAN / 2;
+      var p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', ringPath(R, R + 6, R * Core.FAN_BAND_OUT, ang - half + gap, ang + half - gap));
+      p.setAttribute('class', 'dw-fan-sector');
+      w1.svg.appendChild(p);
+      var lab = el('div', 'dw-label dw-fan-label', w1.root);
+      var pt = polarPoint(R, ang, R * 1.28);
+      lab.style.left = pt.x + 'px'; lab.style.top = pt.y + 'px'; lab.style.width = cw + 'px';
+      lab.textContent = item.children[i].name;
+      fanEls.push({ path: p, label: lab });
+    });
+  }
+
+  function clearFan() {
+    fanEls.forEach(function (f) { f.path.remove(); f.label.remove(); });
+    fanEls = [];
   }
 
   function applyHover(force) {
-    if (level === 2 && sub) {
-      var kids = sub.item.children;
-      var ri = rawIdx();
-      var eff2 = ri >= 0 && kids[ri] ? ri : -1;       // empty sub slots are not selectable
-      if (!force && eff2 === sub.hover) return;
-      sub.hover = eff2;
-      setWheelHover(w2, eff2);
-      if (eff2 >= 0) {
-        var c = kids[eff2];
-        setCenter(w2, c.name, c.description, handoffNote(c.tool));
-      } else if (ri < 0) {
-        var d = kids[0];
-        setCenter(w2, sub.item.name, '放開＝開啟預設：' + (d ? d.name : ''), '再按 Shift 回上一層');
+    var o = offsets(), R = w1.r;
+    var dist = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+    var slotHover = -1, child = -1, mode = 'slot';
+    if (fan.open) {
+      if (dist < R - 1e-9) { mode = 'band'; slotHover = fan.group; }          // 0.9R-1.0R: the group slot itself
+      else {
+        child = Core.fanHit(o.dx, o.dy, R, fan.group, slots[fan.group].children.length);
+        mode = child >= 0 ? 'child' : 'outside';
+      }
+    } else {
+      var idx = Core.slotAt(o.dx, o.dy, R * 0.5);
+      slotHover = idx >= 0 && slots[idx] ? idx : -1;                           // empty sectors are not selectable
+    }
+    var key = [fan.open ? fan.group : -1, slotHover, child, mode].join(':');
+    if (!force && key === lastKey) return;
+    lastKey = key;
+    w1.sectors.forEach(function (s, i) {
+      s.classList.toggle('is-hover', i === slotHover);
+      s.classList.toggle('is-open', fan.open && i === fan.group);
+    });
+    w1.labels.forEach(function (l, i) { l.classList.toggle('is-hover', i === slotHover); });
+    w1.chevrons.forEach(function (c, i) {
+      if (!c) return;
+      c.classList.toggle('is-hover', i === slotHover);
+      c.classList.toggle('is-open', fan.open && i === fan.group && i !== slotHover);
+    });
+    fanEls.forEach(function (f, i) {
+      f.path.classList.toggle('is-hover', i === child);
+      f.label.classList.toggle('is-hover', i === child);
+    });
+    if (fan.open) {
+      var g = slots[fan.group];
+      if (mode === 'child') {
+        var c = g.children[child];
+        setCenter(w1, c.name, c.description, handoffNote(c.tool));
+      } else if (mode === 'band') {
+        setCenter(w1, g.name, '放開＝開啟預設：' + (g.children[0] ? g.children[0].name : ''), '拉回收合');
       } else {
-        setCenter(w2, sub.item.name, '這格是空的', '再按 Shift 回上一層');
+        setCenter(w1, g.name, '這裡放開＝取消', '拉回收合');
       }
       return;
     }
-    var idx = rawIdx();
-    var it = idx >= 0 ? slots[idx] : null;
-    var eff = it ? idx : -1;                           // empty sectors are not selectable
-    if (!force && eff === hover) return;
-    hover = eff;
-    setWheelHover(w1, eff);
-    if (it && it.type === 'group') {
-      setCenter(w1, it.name, it.description, '往外甩展開：' + it.children.length + ' 個');
-    } else if (it) {
-      setCenter(w1, it.name, it.description, handoffNote(it.tool));
-    } else {
-      setCenter(w1, kindLabel(kind), '往工具的方向放開', '在中央放開＝取消');
-    }
+    var it = slotHover >= 0 ? slots[slotHover] : null;
+    if (it && it.type === 'group') setCenter(w1, it.name, it.description, '往外甩展開：' + it.children.length + ' 個');
+    else if (it) setCenter(w1, it.name, it.description, handoffNote(it.tool));
+    else setCenter(w1, kindLabel(kind), '往工具的方向放開', '在中央放開＝取消');
   }
 
   /* ── state transitions ────────────────────────────────── */
@@ -301,48 +345,25 @@
   function openWheel() {
     if (wheelOpen || !hasAnySlot()) return;
     wheelOpen = true;
-    level = 1; sub = null; noExpandIdx = -1;
-    radius = Core.wheelRadius(window.innerWidth, window.innerHeight);
-    var c = Core.placeWheel(cursor, viewport(), radius, 8);
+    fan = { open: false, group: -1 }; lastKey = '';
+    // With a group on the wheel keep the whole band (1.6 R) inside the viewport.
+    var withGroup = Core.hasGroup(slots);
+    radius = Core.radiusFor(window.innerWidth, window.innerHeight, withGroup, 8);
+    var c = Core.placeWheel(cursor, viewport(), Core.wheelReach(radius, withGroup), 8);
     hintEl.hidden = true;
     backdropEl.hidden = false;
     w1.root.hidden = false;
-    w1.root.classList.remove('is-behind');
     document.documentElement.classList.add('dw-open');
     renderWheel(w1, slots, c.x, c.y, radius);
     applyHover(true);
   }
 
-  function expandSub(idx) {
-    var item = slots[idx];
-    var c = Core.placeWheel(cursor, viewport(), radius, 8);   // crossing point, same clamp
-    var kids = item.children.slice(0, 8);
-    while (kids.length < 8) kids.push(null);
-    level = 2;
-    sub = { item: item, fromIdx: idx, hover: -2 };
-    w1.root.classList.add('is-behind');
-    w2.root.hidden = false;
-    renderWheel(w2, kids, c.x, c.y, radius);
-    applyHover(true);
-  }
-
-  function collapseSub() {
-    if (level !== 2) return;
-    noExpandIdx = sub.fromIdx;
-    level = 1; sub = null;
-    w2.root.hidden = true;
-    w1.root.classList.remove('is-behind');
-    hover = -2;
-    applyHover(true);
-  }
-
   function closeWheel() {
     wheelOpen = false;
-    level = 1; sub = null; hover = -1; noExpandIdx = -1;
+    clearFan();
+    fan = { open: false, group: -1 }; lastKey = '';
     backdropEl.hidden = true;
     w1.root.hidden = true;
-    w2.root.hidden = true;
-    w1.root.classList.remove('is-behind');
     document.documentElement.classList.remove('dw-open');
   }
 
@@ -356,8 +377,7 @@
 
   function onShiftTap() {
     if (!dragging || !ready) return;
-    if (!wheelOpen) openWheel();
-    else if (level === 2) collapseSub();   // Shift inside the sub-wheel = back to level 1
+    if (!wheelOpen) openWheel();          // once open, Shift does nothing: pulling back is the way out
   }
 
   function placeHint() {
@@ -367,16 +387,15 @@
     hintEl.style.transform = 'translate(' + x + 'px,' + y + 'px)';
   }
 
-  /** Level 1 only: a group slot expands when flung past 1.3 x outer radius. */
-  function maybeExpand() {
-    if (level !== 1) return;
-    var dx = cursor.x - w1.cx, dy = cursor.y - w1.cy;
-    var idx = Core.slotAt(dx, dy, 0);
-    var it = idx >= 0 ? slots[idx] : null;
-    var past = !!it && it.type === 'group' && Core.shouldExpand(dx, dy, radius, idx);
-    if (!past) { noExpandIdx = -1; return; }
-    if (idx === noExpandIdx) return;       // just collapsed here: wait until the pointer comes back in
-    expandSub(idx);
+  /** Hysteresis: open at >= 1.0 R in a group slot, collapse below 0.9 R. Returns true if the fan changed. */
+  function stepFan() {
+    var o = offsets();
+    var next = Core.fanStep(fan, o.dx, o.dy, w1.r, slots);
+    if (next.open === fan.open && next.group === fan.group) return false;
+    fan = next;
+    clearFan();
+    if (fan.open) renderFan(fan.group);
+    return true;
   }
 
   /* ── events ───────────────────────────────────────────── */
@@ -401,7 +420,7 @@
     if (wheelOpen) {
       e.preventDefault();                 // required for the drop to be delivered to us
       e.dataTransfer.dropEffect = 'copy';
-      maybeExpand();
+      stepFan();
       if (!raf) raf = requestAnimationFrame(function () { raf = 0; if (wheelOpen) applyHover(false); });
     } else if (hasAnySlot()) {
       hintEl.hidden = false;
@@ -425,9 +444,9 @@
     e.preventDefault();
     cursor.x = e.clientX; cursor.y = e.clientY;
     // evaluate the drop position itself, not the last rAF
-    var state = { level: level, slots: slots, idx: level === 1 ? rawIdx() : -1 };
-    if (level === 2) state.sub = { item: sub.item, idx: rawIdx() };
-    var id = Core.resolveDrop(state);
+    stepFan();
+    var o = offsets();
+    var id = Core.resolveDrop({ slots: slots, dx: o.dx, dy: o.dy, R: w1.r, fan: fan });
     var tool = id ? toolsById[id] : null;
     var files = Array.prototype.slice.call(e.dataTransfer.files || []);
     endDrag();

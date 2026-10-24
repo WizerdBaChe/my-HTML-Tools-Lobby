@@ -72,18 +72,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dw-backdrop, .dw-wheel { animation: none; }
-  .dw-sector, .dw-label { transition: none; }
+  .dw-sector, .dw-label, .dw-fan-sector { transition: none; }
 }
 
-/* ── level 2 / group marker ─────────────────────────────── */
-.dw-wheel--sub { z-index: 9003; }
-.dw-wheel.is-behind { opacity: .28; transition: opacity 120ms; }
-/* Behind the sub-wheel only the ring stays as a locator; its text would compete with the sub-wheel's. */
-.dw-wheel.is-behind .dw-label,
-.dw-wheel.is-behind .dw-center { visibility: hidden; }
+/* ── group marker + fan band ────────────────────────────── */
 .dw-chevron { fill: none; stroke: var(--ink-muted); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.dw-sector.is-hover ~ .dw-chevron { stroke: var(--paper); }
-.dw-label.is-group { font-style: normal; }
+.dw-chevron.is-hover { stroke: var(--paper); }
+.dw-chevron.is-open { stroke: var(--accent); }
+/* open group slot: distinct from plain hover (filled accent) */
+.dw-sector.is-open { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+.dw-sector.is-open.is-hover { fill: var(--accent); }
+.dw-fan-sector { fill: var(--surface); stroke: var(--shelf); stroke-width: 1; transition: fill 90ms, stroke 90ms; pointer-events: none; }
+.dw-fan-sector.is-hover { fill: var(--accent); stroke: var(--accent-hover); }
+.dw-fan-label { font-size: 0.8rem; }
 .dw-toast { z-index: 9004; }
 
 /* ── config entry + dialog (drop-wheel-config.js) ───────── */

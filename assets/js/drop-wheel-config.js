@@ -87,7 +87,7 @@
       off.forEach(function (it) {
         var li = el('li', 'dwc-lib__item', libEl);
         el('span', 'dwc-lib__name', li, it.type === 'group' ? '▸ ' + it.name : it.name);
-        if (it.type === 'group') el('span', 'dwc-lib__sub', li, it.children.map(function (c) { return c.name; }).join('、'));
+        if (it.type === 'group') el('span', 'dwc-lib__sub', li, it.children.map(function (c) { return c.name; }).join('、') + (it.extra ? '（輪盤最多顯示 5 個，另 ' + it.extra + ' 個只在這裡）' : ''));
       });
     }
     hintEl.textContent = DW.isCustom(kind) ? '已自訂此類檔案的配置。' : '目前是預設配置。';
