@@ -113,7 +113,9 @@
     while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
     labelEls.forEach(function (l) { l.remove(); });
     sectorEls = []; labelEls = [];
-    var cw = Math.max(70, radius * 0.5);
+    // Side sectors are only (outer - inner) wide horizontally; keep a margin so
+    // long names wrap inside the ring instead of touching its edge.
+    var cw = Math.max(64, radius * 0.4);
     for (var i = 0; i < Core.SECTORS; i++) {
       var p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', sectorPath(i));
