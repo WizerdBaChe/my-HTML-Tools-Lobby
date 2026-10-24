@@ -78,6 +78,9 @@
 /* ── level 2 / group marker ─────────────────────────────── */
 .dw-wheel--sub { z-index: 9003; }
 .dw-wheel.is-behind { opacity: .28; transition: opacity 120ms; }
+/* Behind the sub-wheel only the ring stays as a locator; its text would compete with the sub-wheel's. */
+.dw-wheel.is-behind .dw-label,
+.dw-wheel.is-behind .dw-center { visibility: hidden; }
 .dw-chevron { fill: none; stroke: var(--ink-muted); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .dw-sector.is-hover ~ .dw-chevron { stroke: var(--paper); }
 .dw-label.is-group { font-style: normal; }
