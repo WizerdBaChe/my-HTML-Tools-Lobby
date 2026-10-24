@@ -972,6 +972,21 @@
     setStatus('發生未預期錯誤：<code>' + esc(e.message || 'unknown') + '</code>，請重新整理頁面。', 'error');
   });
 
+  /* ── 大廳拖放輪盤的檔案交接（接收端） ──────────────────────────
+     協定：本頁由大廳以 window.open 開啟 → 對 opener 送 lobby-handoff-ready
+     → 大廳回 { type:'lobby-handoff', files:[File] }。僅同源，雙向檢查 origin。
+     沒有 opener（直接開啟、或在預覽 iframe 內）時完全不啟動。 */
+  if (window.opener && window.opener !== window) {
+    window.addEventListener('message', function (ev) {
+      if (ev.origin !== location.origin || ev.source !== window.opener) return;
+      var d = ev.data;
+      if (!d || d.type !== 'lobby-handoff' || !d.files || !d.files.length) return;
+      addFiles(d.files);
+    });
+    try { window.opener.postMessage({ type: 'lobby-handoff-ready' }, location.origin); }
+    catch (err) { console.error('[handoff] cannot reach opener', err); }
+  }
+
   syncFields();
   render();
   detectSupport().catch(function () {
