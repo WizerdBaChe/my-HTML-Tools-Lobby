@@ -1,0 +1,76 @@
+/* drop-wheel.css — lobby drop wheel (launcher feature). Uses main.css variables. */
+
+.dw-hint {
+  position: fixed; left: 0; top: 0; z-index: 9000;
+  padding: 4px 10px;
+  background: var(--ink); color: var(--paper);
+  font: 500 0.8rem/1.4 var(--font-sans);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  pointer-events: none; white-space: nowrap;
+}
+
+.dw-backdrop {
+  position: fixed; inset: 0; z-index: 9001;
+  background: rgba(245, 240, 232, 0.72);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+  animation: dw-fade 140ms ease-out;
+}
+@media (prefers-color-scheme: dark) {
+  .dw-backdrop { background: rgba(26, 23, 20, 0.72); }
+}
+
+.dw-wheel {
+  position: fixed; z-index: 9002;
+  pointer-events: none;           /* drag events must reach document */
+  font-family: var(--font-sans);
+  animation: dw-pop 160ms ease-out;
+}
+.dw-svg { position: absolute; inset: 0; overflow: visible; }
+
+.dw-sector {
+  fill: var(--surface); stroke: var(--shelf); stroke-width: 1;
+  transition: fill 90ms, stroke 90ms;
+}
+.dw-sector.is-empty { fill: transparent; stroke-dasharray: 3 4; stroke: var(--warm-mid); }
+.dw-sector.is-hover { fill: var(--accent); stroke: var(--accent-hover); }
+
+.dw-label {
+  position: absolute; transform: translate(-50%, -50%);
+  text-align: center; font-size: 0.85rem; font-weight: 600; line-height: 1.25;
+  color: var(--ink); overflow-wrap: anywhere;
+  transition: color 90ms;
+}
+.dw-label.is-hover { color: var(--paper); }
+
+.dw-center {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; text-align: center; padding: 0 8px;
+}
+.dw-center__title { font: 700 1rem/1.3 var(--font-serif); color: var(--ink); }
+.dw-center__desc  { font-size: 0.72rem; line-height: 1.35; color: var(--ink-secondary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dw-center__note  { font-size: 0.72rem; font-weight: 600; color: var(--accent); }
+.dw-center__page  { font: 400 0.7rem var(--font-mono); color: var(--ink-muted); }
+
+.dw-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 9003;
+  display: flex; gap: 12px; align-items: center;
+  padding: 8px 14px; background: var(--ink); color: var(--paper);
+  font: 500 0.85rem var(--font-sans); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+}
+.dw-toast[hidden], .dw-hint[hidden], .dw-backdrop[hidden], .dw-wheel[hidden] { display: none; }
+.dw-toast__btn {
+  background: var(--paper); color: var(--ink); border: 0; border-radius: var(--radius-sm);
+  padding: 4px 10px; font: 600 0.8rem var(--font-sans); cursor: pointer;
+}
+
+@keyframes dw-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dw-pop  { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-backdrop, .dw-wheel { animation: none; }
+  .dw-sector, .dw-label { transition: none; }
+}
