@@ -78,7 +78,7 @@
 /* ── level 2 / group marker ─────────────────────────────── */
 .dw-wheel--sub { z-index: 9003; }
 .dw-wheel.is-behind { opacity: .28; transition: opacity 120ms; }
-.dw-chevron { fill: none; stroke: var(--ink-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.dw-chevron { fill: none; stroke: var(--ink-muted); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .dw-sector.is-hover ~ .dw-chevron { stroke: var(--paper); }
 .dw-label.is-group { font-style: normal; }
 .dw-toast { z-index: 9004; }
@@ -87,6 +87,7 @@
 .dw-config-btn { height: 36px; }
 
 .dwc {
+  margin: auto; /* main.css reset zeroes dialog's default auto margins */
   width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
   padding: var(--space-5); border: 1px solid var(--shelf); border-radius: var(--radius-md);
   background: var(--paper); color: var(--ink); box-shadow: var(--shadow-lg);

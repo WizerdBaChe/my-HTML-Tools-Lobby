@@ -159,8 +159,8 @@
 
   /** Small outward chevron at a group sector's outer edge. */
   function chevronPath(r, i) {
-    var tip = polarPoint(r, i * 45, r - 5), base = polarPoint(r, i * 45, r - 15);
-    var a = i * 45 * Math.PI / 180, px = Math.cos(a) * 6, py = Math.sin(a) * 6;
+    var tip = polarPoint(r, i * 45, r - 5), base = polarPoint(r, i * 45, r - 19);
+    var a = i * 45 * Math.PI / 180, px = Math.cos(a) * 9, py = Math.sin(a) * 9;
     return 'M' + (base.x - px) + ' ' + (base.y - py) + ' L' + tip.x + ' ' + tip.y + ' L' + (base.x + px) + ' ' + (base.y + py);
   }
 
