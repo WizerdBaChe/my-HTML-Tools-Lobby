@@ -1,0 +1,4 @@
+#!/bin/sh
+# Enabled per clone with: git config core.hooksPath .githooks
+# updatedAt may never be later than the tool's own newest change (tests/updated-at.test.mjs).
+exec node tests/updated-at.test.mjs

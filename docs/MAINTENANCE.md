@@ -212,6 +212,16 @@ YYYY-MM-DD
 
 避免混用不同日期格式，否則排序容易錯。
 
+`updatedAt` 是**工具本身**最後一次修改的日期，不是 `tools.json` 這一筆描述的修改日期。只改卡片文字、標籤，不用動它。
+
+它不能晚於工具自己最新的那次變動，提交前由 `node tests/updated-at.test.mjs` 檢查（2026-10-26 起）：
+
+- 本地工具 `tools/<id>/`：不能晚於該資料夾最後一次提交的日期；資料夾有未提交的修改時，上限是今天。
+- 外部工具 `<帳號>.github.io/<repo>/`：不能晚於該 repo 最後一次推送的日期。日期來自 `tests/repo-dates.json`，用 `node tests/updated-at.test.mjs --refresh` 重抓（需要 `gh`）。
+- 這只是上限：像 2026-09-04 那種全站大掃除提交只會把上限放寬，不會誤擋。
+
+新 clone 要先跑一次 `git config core.hooksPath .githooks`，提交時才會自動檢查。
+
 ## 新增工具流程
 > **外部工具（獨立 repo）**：若工具已部署於其他網址，只需完成步驟 3–4，並將 `path` 填入完整 URL、`supportsIframe` 設為 `false`，不需建立本地資料夾。
 

@@ -1,0 +1,2 @@
+# Git hooks are run by sh: a CRLF checkout would end each command with \r
+.githooks/* text eol=lf

@@ -1,0 +1,9 @@
+{
+  "fetchedAt": "2026-10-26",
+  "how": "gh api repos/<owner/repo> --jq .pushed_at as an Asia/Taipei day; null = not readable",
+  "repos": {
+    "wizerdbache/ArchLens-Web": "2026-06-29",
+    "wizerdbache/ArchLens-DiffTeller": "2026-06-25",
+    "wizerdbache/ArchLens-DependencyTeller": "2026-06-30"
+  }
+}
